@@ -1,0 +1,17 @@
+[package]
+name = "switcheroo"
+version = "0.1.0"
+authors = ["Bernard Kolobara <me@kolobara.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+stackpp = {path = "../stackpp"}
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "switcheroo_benchmark"
+harness = false

@@ -1,0 +1,17 @@
+[package]
+name = "stackpp"
+version = "0.1.0"
+authors = ["Bernard Kolobara <me@kolobara.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "stackpp_benchmark"
+harness = false
