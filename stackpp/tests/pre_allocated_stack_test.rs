@@ -55,6 +55,7 @@ fn trigger_signal_and_grow_stack_outside_first_4kb() -> Result<(), Error> {
         *(bottom.sub(4 * 1024 + 1)) = 64;
         assert_eq!(*(bottom.sub(4 * 1024 + 1)), 64);
     }
+    PreAllocatedStack::take_from_signal(); // Take the stack from the thread local variable so it can get dropped.
     Ok(())
 }
 

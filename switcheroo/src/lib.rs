@@ -6,8 +6,9 @@ use std::marker::PhantomData;
 use std::cell::Cell;
 
 pub struct Generator<'a, Input: 'a, Output: 'a, Stack: stackpp::Stack> {
+    stack: Option<Stack>,
     stack_ptr: *mut u8,
-    phantom: PhantomData<(&'a (), *mut Input, *const Output, &'a Stack)>,
+    phantom: PhantomData<(&'a (), *mut Input, *const Output)>,
 }
 
 impl<'a, Input, Output, Stack> Generator<'a, Input, Output, Stack>
@@ -16,7 +17,7 @@ where
     Output: 'a,
     Stack: stackpp::Stack,
 {
-    pub fn new<F>(stack: &'a Stack, f: F) -> Generator<'a, Input, Output, Stack>
+    pub fn new<F>(stack: Stack, f: F) -> Generator<'a, Input, Output, Stack>
     where
         F: FnOnce(&Yielder<Input, Output>, Input) + 'a,
     {
@@ -33,13 +34,14 @@ where
             loop { yielder.suspend(None); }
         }
 
-        let stack_ptr = unsafe { arch::init(stack, generator_wrapper::<Input, Output, Stack, F>) };
+        let stack_ptr = unsafe { arch::init(&stack, generator_wrapper::<Input, Output, Stack, F>) };
         let stack_ptr = unsafe { arch::swap(&f as *const F as usize, stack_ptr).1 };
         // We can't drop f when returning from this function. Maybe store it inside the Generator struct so it
         // doesn't get dropped before the generator.
         std::mem::forget(f);
 
         Generator {
+            stack: Some(stack),
             stack_ptr,
             phantom: PhantomData,
         }
@@ -47,7 +49,13 @@ where
 
     #[inline(always)]
     pub fn resume(&mut self, input: Input) -> Option<Output> {
+        let stack = self.stack.take();
+        debug_assert!(stack.is_some());
+        stack.unwrap().give_to_signal();
         let (data_out, stack_ptr) = unsafe { arch::swap(&input as *const Input as usize, self.stack_ptr) };
+        let stack = Stack::take_from_signal();
+        debug_assert!(stack.is_some());
+        self.stack = Some(stack.unwrap());
         self.stack_ptr = stack_ptr;
         std::mem::forget(input);
         unsafe { std::ptr::read(data_out as *const Option<Output>) }

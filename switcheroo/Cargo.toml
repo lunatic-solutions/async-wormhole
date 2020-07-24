@@ -11,6 +11,7 @@ stackpp = {path = "../stackpp"}
 
 [dev-dependencies]
 criterion = "0.3"
+libc = "0.2"
 
 [[bench]]
 name = "switcheroo_benchmark"

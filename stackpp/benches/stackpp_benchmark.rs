@@ -6,6 +6,7 @@ use stackpp::Stack;
 use std::io::Error;
 
 fn stackpp(c: &mut Criterion) {
+    // All this tests both allocation and drop.
     c.bench_function("allocate 4 KB stack", |b| {
         b.iter(|| PreAllocatedStack::new(4 * 1024))
     });
@@ -58,7 +59,7 @@ fn stackpp(c: &mut Criterion) {
             || PreAllocatedStack::new(8 * 1024).unwrap(),
             |stack| {
                 let bottom = stack.bottom();
-                stack.give_to_signal(); // Around 650ns on my i7-4850HQ (Macbook Pro)
+                stack.give_to_signal(); // Around ~17ns to put & take out on my i7-4850HQ (Macbook Pro)
                 unsafe { *(bottom.sub(4 * 1024 + 1)) = 1 }
             },
             BatchSize::SmallInput,
@@ -73,7 +74,7 @@ fn stackpp(c: &mut Criterion) {
             || PreAllocatedStack::new(8 * 1024 * 1024).unwrap(),
             |stack| {
                 let bottom = stack.bottom();
-                stack.give_to_signal(); // Around 650ns on my i7-4850HQ (Macbook Pro)
+                stack.give_to_signal();
                 unsafe {
                     *(bottom.sub(4 * 1024 + 1)) = 1;
                     *(bottom.sub(8 * 1024 + 1)) = 1;
