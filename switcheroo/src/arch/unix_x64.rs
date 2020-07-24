@@ -5,8 +5,11 @@
 /// The `switch` function will pop this values to set up the function call.
 pub unsafe fn init<S: stackpp::Stack>(stack: &S, f: unsafe extern "C" fn(usize, *mut u8) -> !) -> *mut u8 {
     let bottom = stack.bottom() as *mut usize;
+    // Aligne stack (I don't really understand this alignment, because now the address is actually not divisible by 16 bytes)
+    // But maybe it can't point under the stack?
+    let bottom = bottom.offset(-1);
 
-    let first_stack_argument = bottom.offset(-1) ;
+    let first_stack_argument = bottom.offset(-1);
     *first_stack_argument = f as usize;
     let second_stack_argument = first_stack_argument.offset(-1);
     *second_stack_argument = bottom as usize;

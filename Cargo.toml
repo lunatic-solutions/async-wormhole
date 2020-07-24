@@ -25,4 +25,5 @@ members = [
   ".",
   "stackpp",
   "switcheroo",
+  "example"
 ]
