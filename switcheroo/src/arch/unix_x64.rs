@@ -31,7 +31,7 @@ pub unsafe fn swap(arg: usize, new_sp: *mut u8) -> (usize, *mut u8) {
 
     asm!(
         // Save the continuation spot after we jump back here to be after this asm block.
-        "lea rax, [1337f + rip]",
+        "lea rax, [rip + 1337f]",
         "push rax",
         // Save the frame pointer as it can't be marked as an output register.
         "push rbp",
@@ -52,17 +52,15 @@ pub unsafe fn swap(arg: usize, new_sp: *mut u8) -> (usize, *mut u8) {
         inout("rdi") arg => ret_val, // 1st argument to called function
         out("rsi") ret_sp, // 2nd argument to called function
         out("rax") _, out("rbx") _, out("rcx") _, lateout("rdx") _,
+
         out("r8") _, out("r9") _, out("r10") _, out("r11") _,
         out("r12") _, out("r13") _, out("r14") _, out("r15") _,
+
         out("xmm0") _, out("xmm1") _, out("xmm2") _, out("xmm3") _,
         out("xmm4") _, out("xmm5") _, out("xmm6") _, out("xmm7") _,
         out("xmm8") _, out("xmm9") _, out("xmm10") _, out("xmm11") _,
         out("xmm12") _, out("xmm13") _, out("xmm14") _, out("xmm15") _,
-        // avx512f:
-        // out("xmm16") _, out("xmm17") _, out("xmm18") _, out("xmm19") _,
-        // out("xmm20") _, out("xmm21") _, out("xmm22") _, out("xmm23") _,
-        // out("xmm24") _, out("xmm25") _, out("xmm26") _, out("xmm27") _,
-        // out("xmm28") _, out("xmm29") _, out("xmm30") _, out("xmm31") _,
+
         options(preserves_flags)
     );
 

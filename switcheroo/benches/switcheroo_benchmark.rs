@@ -6,7 +6,7 @@ use stackpp::Stack;
 use switcheroo::Generator;
 
 fn switcheroo(c: &mut Criterion) {
-    c.bench_function("switch between stacks", |b| {   
+    c.bench_function("switch between stacks", |b| {
         b.iter_batched_ref(
             || {
                 let stack = PreAllocatedStack::new(1 * 1024 * 1024).unwrap();
@@ -15,7 +15,7 @@ fn switcheroo(c: &mut Criterion) {
                 })
             },
             |generator| {
-                generator.resume(2);
+                generator.resume(2)
             },
             BatchSize::SmallInput,
         )
