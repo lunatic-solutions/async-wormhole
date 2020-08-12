@@ -44,7 +44,6 @@ fn allow_access_inside_first_4kb() -> Result<(), Error> {
     Ok(())
 }
 
-
 #[test]
 fn trigger_signal_and_grow_stack_outside_first_4kb() -> Result<(), Error> {
     let stack = PreAllocatedStack::new(8 * 1024)?; // 8 KB
@@ -59,13 +58,12 @@ fn trigger_signal_and_grow_stack_outside_first_4kb() -> Result<(), Error> {
     Ok(())
 }
 
+#[cfg(target_family = "unix")]
 unsafe fn set_signal_handler(
     f: unsafe extern "C" fn(libc::c_int, *mut libc::siginfo_t, *mut libc::c_void) -> bool,
 ) {
     let register = |signal: i32| {
         let mut handler: libc::sigaction = std::mem::zeroed();
-        // The flags here are relatively careful, and they are...
-        //
         // SA_SIGINFO gives us access to information like the program
         // counter from where the fault happened.
         //
@@ -89,5 +87,35 @@ unsafe fn set_signal_handler(
         register(libc::SIGBUS);
     } else {
         register(libc::SIGSEGV);
+    }
+}
+
+#[cfg(target_family = "windows")]
+unsafe fn set_signal_handler(
+    f: unsafe extern "system" fn(winapi::um::winnt::PEXCEPTION_POINTERS) -> bool,
+) {
+    // WASMTIME expects the signal handler to return true/false, but the windows API expects an i32 value.
+    // We use here a wrapper function. It's a bit hard to wrap around a fn that is not a closure and we are
+    // forced to apply a little static variable trick here. Notice that this code would not work if we passed
+    // 2 different `f` arguments in two different calls, both handlers would reference the last one. But for
+    // our testing purposes this is ok, as we will always use `PreAllocatedStack::signal_handler` as `f`.
+    static mut F: Option<unsafe extern "system" fn(winapi::um::winnt::PEXCEPTION_POINTERS) -> bool> = None;
+    F = Some(f);
+    unsafe extern "system" fn helper_handler(exception_info: winapi::um::winnt::PEXCEPTION_POINTERS) -> winapi::um::winnt::LONG {
+        use winapi::um::minwinbase::*;
+        let record = &*(*exception_info).ExceptionRecord;
+        // If it's not an access violation let the next handler take care of it.
+        if record.ExceptionCode != EXCEPTION_ACCESS_VIOLATION
+        {
+            return winapi::vc::excpt::EXCEPTION_CONTINUE_SEARCH;
+        }
+
+        let f = F.unwrap();
+        f(exception_info);
+        winapi::vc::excpt::EXCEPTION_CONTINUE_EXECUTION
+    }
+
+    if winapi::um::errhandlingapi::AddVectoredExceptionHandler(1, Some(helper_handler)).is_null() {
+        panic!("failed to add exception handler: {}", Error::last_os_error());
     }
 }

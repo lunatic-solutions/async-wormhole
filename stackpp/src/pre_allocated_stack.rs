@@ -1,5 +1,3 @@
-use libc::{mmap, mprotect, munmap};
-use libc::{MAP_ANON, MAP_FAILED, MAP_NORESERVE, MAP_PRIVATE, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::cell::Cell;
 use std::io::{Error, ErrorKind};
 use std::ptr;
@@ -80,22 +78,27 @@ impl Stack for PreAllocatedStack {
     /// This signal handler will return true if it handeled the signal. This plays nicely with
     /// WASMTIME's `set_signal_handler`. The conditions under which this signal handler will try
     /// to grow the stack are:
-    /// * The signal was of type SIGSEGV or SIGBUS
+    /// * The signal was of type SIGSEGV or SIGBUS (on Windows of type EXCEPTION_ACCESS_VIOLATION)
     /// * the stack pointer points inside the stack's guarded area
     /// The signal will attempt to grow the stack, if there is not enough guarded space to be used
     /// it will return false to signalise WASMTIME to raise a trap.
+    #[cfg(target_family = "unix")]
     unsafe extern "C" fn signal_handler(
         signum: libc::c_int,
         siginfo: *mut libc::siginfo_t,
         _context: *mut libc::c_void,
     ) -> bool {
-        match signum {
-            libc::SIGSEGV => (),
-            libc::SIGBUS => (),
-            _ => return false,
+        // On Darwin, guard page accesses are raised as SIGBUS.
+        let expected_guard_page_signal = if cfg!(target_os = "macos") {
+            libc::SIGBUS
+        } else {
+            libc::SIGSEGV
         };
+        if signum != expected_guard_page_signal {
+            return false;
+        }
 
-        assert!(!siginfo.is_null(), "siginfo must not be null");
+        debug_assert!(!siginfo.is_null(), "siginfo must not be null");
 
         CURRENT_STACK.with(|stack| {
             let si_addr = (*siginfo).si_addr;
@@ -114,10 +117,42 @@ impl Stack for PreAllocatedStack {
             return false;
         })
     }
+    #[cfg(target_family = "windows")]
+    unsafe extern "system" fn signal_handler(exception_info: winapi::um::winnt::PEXCEPTION_POINTERS) -> bool {
+        use winapi::um::minwinbase::EXCEPTION_ACCESS_VIOLATION;
+
+        let record = &*(*exception_info).ExceptionRecord;
+        if record.ExceptionCode != EXCEPTION_ACCESS_VIOLATION {
+            return false;
+        }
+
+        CURRENT_STACK.with(|stack| {
+            // The second element of ExceptionInformation contains the address of the violation
+            let si_addr = record.ExceptionInformation[1];
+            let mut stack = match stack.take() {
+                Some(stack) => stack,
+                None => panic!("Stack's signal handler can't find a stack"),
+            };
+            if stack.stack_pointer_inside_guard(si_addr as *mut u8) {
+                let result = stack.grow();
+                if result.is_ok() {
+                    stack.give_to_signal();
+                    return true;
+                }
+            }
+            stack.give_to_signal();
+            return false;
+        })
+    }
+
 }
 
-impl PreAllocatedStack {    
+#[cfg(target_family = "unix")]
+impl PreAllocatedStack { 
     unsafe fn alloc(size: usize) -> Result<*mut u8, Error> {
+        use libc::{mmap, mprotect};
+        use libc::{MAP_ANON, MAP_FAILED, MAP_NORESERVE, MAP_PRIVATE, PROT_NONE, PROT_READ, PROT_WRITE}; 
+
         let ptr = mmap(
             ptr::null_mut(),
             size,
@@ -136,6 +171,9 @@ impl PreAllocatedStack {
     /// Mark the bottom part between `top` and `top_guard` writable.
     /// Notice that when a new stack is allocated, bottom and top are at the same address;
     unsafe fn extend_usable(top: *mut u8, size: usize) -> Result<*mut u8, Error> {
+        use libc::{mmap, mprotect};
+        use libc::{MAP_ANON, MAP_FAILED, MAP_NORESERVE, MAP_PRIVATE, PROT_NONE, PROT_READ, PROT_WRITE};
+
         if mprotect(
             top.sub(size) as *mut libc::c_void,
             size,
@@ -149,21 +187,77 @@ impl PreAllocatedStack {
     }
 }
 
+#[cfg(target_family = "windows")]
+impl PreAllocatedStack {
+    unsafe fn alloc(size: usize) -> Result<*mut u8, Error> {
+        use winapi::um::memoryapi::VirtualAlloc;
+        use winapi::um::winnt::{MEM_RESERVE, PAGE_NOACCESS};
+
+        let ptr = VirtualAlloc(ptr::null_mut(), size, MEM_RESERVE, PAGE_NOACCESS);
+        if ptr.is_null() {
+            Err(Error::last_os_error())
+        } else {
+            Ok(ptr as *mut u8)
+        }
+    }
+
+    unsafe fn extend_usable(top: *mut u8, size: usize) -> Result<*mut u8, Error> {
+        use winapi::um::memoryapi::VirtualAlloc;
+        use winapi::um::winnt::{MEM_COMMIT, PAGE_READWRITE};
+
+        if !VirtualAlloc(
+            top.sub(size) as *mut winapi::ctypes::c_void,
+            size,
+            MEM_COMMIT,
+            PAGE_READWRITE,
+        ).is_null()
+        {
+            Ok(top.sub(size))
+        } else {
+            Err(Error::last_os_error())
+        }
+    }
+}
+
+#[cfg(target_family = "unix")]
 impl Drop for PreAllocatedStack {
     fn drop(&mut self) {
         let total_size = unsafe { self.bottom.sub(self.guard_top as usize) as usize };
-        let result = unsafe { munmap(self.guard_top as *mut libc::c_void, total_size) };
-        assert_eq!(result, 0);
+        let result = unsafe { libc::munmap(self.guard_top as *mut libc::c_void, total_size) };
+        debug_assert_eq!(result, 0);
+    }
+}
+
+#[cfg(target_family = "windows")]
+impl Drop for PreAllocatedStack {
+    fn drop(&mut self) {
+        use winapi::um::memoryapi::VirtualFree;
+        use winapi::um::winnt::MEM_RELEASE;
+        let result = unsafe { VirtualFree(self.guard_top as *mut winapi::ctypes::c_void, 0, MEM_RELEASE) };
+        debug_assert_ne!(result, 0);
     }
 }
 
 /// Returns page size in bytes
 pub fn page_size() -> usize {
     #[cold]
+    #[cfg(target_family = "unix")]
     pub fn sys_page_size() -> usize {
         unsafe { libc::sysconf(libc::_SC_PAGESIZE) as usize }
     }
     
+    #[cold]
+    #[cfg(target_family = "windows")]
+    pub fn sys_page_size() -> usize {
+        use winapi::um::sysinfoapi::{SYSTEM_INFO, LPSYSTEM_INFO};
+        use winapi::um::sysinfoapi::GetSystemInfo;
+
+        unsafe { 
+            let mut info: SYSTEM_INFO = std::mem::zeroed();
+            GetSystemInfo(&mut info as LPSYSTEM_INFO);
+            info.dwPageSize as usize
+         }
+    }
 
     static PAGE_SIZE_CACHE: AtomicUsize = AtomicUsize::new(0);
     match PAGE_SIZE_CACHE.load(Ordering::Relaxed) {

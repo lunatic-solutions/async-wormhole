@@ -24,9 +24,15 @@ pub trait Stack: Sized {
     fn take_from_signal() -> Option<Self>;
 
     /// Handle signals raised by guard page access.
+    #[cfg(target_family = "unix")]
     unsafe extern "C" fn signal_handler(
         signum: libc::c_int,
         siginfo: *mut libc::siginfo_t,
         _context: *mut libc::c_void,
+    ) -> bool;
+
+    #[cfg(target_family = "windows")]
+    unsafe extern "system" fn signal_handler(
+        exception_info: winapi::um::winnt::PEXCEPTION_POINTERS
     ) -> bool;
 }
