@@ -10,6 +10,18 @@ fn crate_1mb_stack() -> Result<(), Error> {
 }
 
 #[test]
+fn crate_100tb_of_stacks() -> Result<(), Error> {
+    let mut stacks = vec![];
+    for _i in 0..100 {
+        let stack = PreAllocatedStack::new(1024 * 1024 * 1024 * 1024); // 1 TB
+        assert!(stack.is_ok());
+        stacks.push(stack);
+    }
+    
+    Ok(())
+}
+
+#[test]
 fn grow_1x_8kb_stack() -> Result<(), Error> {
     let mut stack = PreAllocatedStack::new(8 * 1024)?; // 8 KB
     stack.grow()?;

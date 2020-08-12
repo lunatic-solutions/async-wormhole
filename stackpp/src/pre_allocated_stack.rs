@@ -150,8 +150,7 @@ impl Stack for PreAllocatedStack {
 #[cfg(target_family = "unix")]
 impl PreAllocatedStack { 
     unsafe fn alloc(size: usize) -> Result<*mut u8, Error> {
-        use libc::{mmap, mprotect};
-        use libc::{MAP_ANON, MAP_FAILED, MAP_NORESERVE, MAP_PRIVATE, PROT_NONE, PROT_READ, PROT_WRITE}; 
+        use libc::{mmap, MAP_ANON, MAP_FAILED, MAP_NORESERVE, MAP_PRIVATE, PROT_NONE}; 
 
         let ptr = mmap(
             ptr::null_mut(),
@@ -171,8 +170,7 @@ impl PreAllocatedStack {
     /// Mark the bottom part between `top` and `top_guard` writable.
     /// Notice that when a new stack is allocated, bottom and top are at the same address;
     unsafe fn extend_usable(top: *mut u8, size: usize) -> Result<*mut u8, Error> {
-        use libc::{mmap, mprotect};
-        use libc::{MAP_ANON, MAP_FAILED, MAP_NORESERVE, MAP_PRIVATE, PROT_NONE, PROT_READ, PROT_WRITE};
+        use libc::{mprotect, PROT_READ, PROT_WRITE};
 
         if mprotect(
             top.sub(size) as *mut libc::c_void,
