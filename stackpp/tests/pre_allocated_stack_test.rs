@@ -30,15 +30,16 @@ fn grow_1x_8kb_stack() -> Result<(), Error> {
 
 #[test]
 fn grow_2x_16kb_stack() -> Result<(), Error> {
-    let mut stack = PreAllocatedStack::new(16 * 1024)?; // 8 KB
+    let mut stack = PreAllocatedStack::new(16 * 1024)?; // 16 KB
     stack.grow()?;
     stack.grow()?;
     Ok(())
 }
 
 #[test]
-fn fail_on_2x_grow_8kb_stack() -> Result<(), Error> {
-    let mut stack = PreAllocatedStack::new(8 * 1024)?; // 8 KB
+fn fail_on_3x_grow_16kb_stack() -> Result<(), Error> {
+    let mut stack = PreAllocatedStack::new(16 * 1024)?; // 16 KB
+    stack.grow()?;
     stack.grow()?;
     let fail = stack.grow().is_err();
     assert_eq!(fail, true);
@@ -114,17 +115,15 @@ unsafe fn set_signal_handler(
     static mut F: Option<unsafe extern "system" fn(winapi::um::winnt::PEXCEPTION_POINTERS) -> bool> = None;
     F = Some(f);
     unsafe extern "system" fn helper_handler(exception_info: winapi::um::winnt::PEXCEPTION_POINTERS) -> winapi::um::winnt::LONG {
-        use winapi::um::minwinbase::*;
-        let record = &*(*exception_info).ExceptionRecord;
-        // If it's not an access violation let the next handler take care of it.
-        if record.ExceptionCode != EXCEPTION_ACCESS_VIOLATION
-        {
-            return winapi::vc::excpt::EXCEPTION_CONTINUE_SEARCH;
-        }
-
         let f = F.unwrap();
-        f(exception_info);
-        winapi::vc::excpt::EXCEPTION_CONTINUE_EXECUTION
+
+        // If it's not a guard page violation or the stack pointer is not inside a guard page, let the next
+        // handler take care of it.
+        if !f(exception_info) {
+            winapi::vc::excpt::EXCEPTION_CONTINUE_SEARCH
+        } else {
+            winapi::vc::excpt::EXCEPTION_CONTINUE_EXECUTION
+        }
     }
 
     if winapi::um::errhandlingapi::AddVectoredExceptionHandler(1, Some(helper_handler)).is_null() {

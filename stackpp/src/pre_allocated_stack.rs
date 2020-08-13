@@ -10,7 +10,8 @@ thread_local! {
     /// inside the signal handler the stack is extended. There is no other way of passing the currently
     /// used stack to the signal handler except saving it in a thread local variable. Signals generated
     /// in response to hardware exceptions, like SIGSEGV, SIGBUS, SIGILL, .. are called thread-directed
-    /// signals and are guaranteed to be handled by the same thread that raised them.
+    /// signals and are guaranteed to be handled by the same thread that raised them. I assume the same
+    /// is true for windows exception handling.
     /// Every time we want to make the stack available to the signal handler we need to first call the
     /// `give_to_signal` method. To get back the stack we need to call `take_from_signal`.
     pub(crate) static CURRENT_STACK: Cell<Option<PreAllocatedStack>> = Cell::new(None);
@@ -19,9 +20,13 @@ thread_local! {
 /// Divdes the stack in 2 parts:
 /// * A usable area (from bottom[excluding] to top[including]), that can be written to and read from.
 /// * A guarded area (from top to guard_top), when accessed will trigger a OS signal.
-/// This allows us to reserver a biger virtual memory space from the OS, but only marking it read/write
+/// This allows us to reserver a bigger virtual memory space from the OS, but only marking it read/write
 /// once we actually need it. We assume here that virtual memory is cheap and that there is no big cost
-/// in pre-allocating a big amount of it.
+/// in pre-allocating a big amount of it. This is generally true on all 64 bit Operating Systems.
+/// This is also how Windows internally manages stacks of threads. It just keeps removing the guard page
+/// until it reaches the maximum allowed stack size (the limit is kept in a the TIB[1] and checked on an
+/// exception if memory beyond all guard pages is accessed).
+/// [1] https://en.wikipedia.org/wiki/Win32_Thread_Information_Block
 pub struct PreAllocatedStack {
     guard_top: *mut u8,
     top: *mut u8,
@@ -31,8 +36,9 @@ pub struct PreAllocatedStack {
 impl Stack for PreAllocatedStack {
     fn new(total_size: usize) -> Result<Self, Error> {
         unsafe {
-            // Add one extra guard page at the top of the stack if we use the whole size.
-            let total_size = total_size + page_size();
+            // Add 2 extra guard pages at the top of the stack if we use the whole size, so that there
+            // is enough stack for the exception handler on windows.
+            let total_size = total_size + 2 * page_size();
             let guard_top = Self::alloc(total_size)?;
             let bottom = guard_top.add(total_size);
             let top = Self::extend_usable(bottom, page_size())?;
@@ -119,10 +125,10 @@ impl Stack for PreAllocatedStack {
     }
     #[cfg(target_family = "windows")]
     unsafe extern "system" fn signal_handler(exception_info: winapi::um::winnt::PEXCEPTION_POINTERS) -> bool {
-        use winapi::um::minwinbase::EXCEPTION_ACCESS_VIOLATION;
+        use winapi::um::minwinbase::EXCEPTION_GUARD_PAGE;
 
         let record = &*(*exception_info).ExceptionRecord;
-        if record.ExceptionCode != EXCEPTION_ACCESS_VIOLATION {
+        if record.ExceptionCode != EXCEPTION_GUARD_PAGE {
             return false;
         }
 
@@ -189,9 +195,9 @@ impl PreAllocatedStack {
 impl PreAllocatedStack {
     unsafe fn alloc(size: usize) -> Result<*mut u8, Error> {
         use winapi::um::memoryapi::VirtualAlloc;
-        use winapi::um::winnt::{MEM_RESERVE, PAGE_NOACCESS};
+        use winapi::um::winnt::{MEM_RESERVE, PAGE_GUARD, PAGE_READONLY};
 
-        let ptr = VirtualAlloc(ptr::null_mut(), size, MEM_RESERVE, PAGE_NOACCESS);
+        let ptr = VirtualAlloc(ptr::null_mut(), size, MEM_RESERVE, PAGE_GUARD | PAGE_READONLY);
         if ptr.is_null() {
             Err(Error::last_os_error())
         } else {
@@ -201,7 +207,7 @@ impl PreAllocatedStack {
 
     unsafe fn extend_usable(top: *mut u8, size: usize) -> Result<*mut u8, Error> {
         use winapi::um::memoryapi::VirtualAlloc;
-        use winapi::um::winnt::{MEM_COMMIT, PAGE_READWRITE};
+        use winapi::um::winnt::{MEM_COMMIT, PAGE_READWRITE, PAGE_GUARD};
 
         if !VirtualAlloc(
             top.sub(size) as *mut winapi::ctypes::c_void,
@@ -210,7 +216,18 @@ impl PreAllocatedStack {
             PAGE_READWRITE,
         ).is_null()
         {
-            Ok(top.sub(size))
+            // Add one guard page at top of the *usable* stack.
+            if !VirtualAlloc(
+                top.sub(size + page_size()) as *mut winapi::ctypes::c_void,
+                page_size(),
+                MEM_COMMIT,
+                PAGE_GUARD | PAGE_READWRITE,
+            ).is_null()
+            {
+                Ok(top.sub(size))
+            } else {
+                Err(Error::last_os_error())
+            }
         } else {
             Err(Error::last_os_error())
         }

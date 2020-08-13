@@ -159,17 +159,15 @@ unsafe fn set_signal_handler(
     static mut F: Option<unsafe extern "system" fn(winapi::um::winnt::PEXCEPTION_POINTERS) -> bool> = None;
     F = Some(f);
     unsafe extern "system" fn helper_handler(exception_info: winapi::um::winnt::PEXCEPTION_POINTERS) -> winapi::um::winnt::LONG {
-        use winapi::um::minwinbase::*;
-        let record = &*(*exception_info).ExceptionRecord;
-        // If it's not an access violation let the next handler take care of it.
-        if record.ExceptionCode != EXCEPTION_ACCESS_VIOLATION
-        {
-            return winapi::vc::excpt::EXCEPTION_CONTINUE_SEARCH;
-        }
-
         let f = F.unwrap();
-        f(exception_info);
-        winapi::vc::excpt::EXCEPTION_CONTINUE_EXECUTION
+
+        // If it's not a guard page violation or the stack pointer is not inside a guard page, let the next
+        // handler take care of it.
+        if !f(exception_info) {
+            winapi::vc::excpt::EXCEPTION_CONTINUE_SEARCH
+        } else {
+            winapi::vc::excpt::EXCEPTION_CONTINUE_EXECUTION
+        }
     }
 
     if winapi::um::errhandlingapi::AddVectoredExceptionHandler(1, Some(helper_handler)).is_null() {
