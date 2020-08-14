@@ -1,7 +1,6 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
-use stackpp::pre_allocated_stack::PreAllocatedStack;
-use stackpp::Stack;
+use stackpp::*;
 
 use switcheroo::Generator;
 

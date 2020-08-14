@@ -12,6 +12,7 @@ stackpp = {path = "../stackpp"}
 [dev-dependencies]
 criterion = "0.3"
 libc = "0.2"
+winapi = { version = "0.3", features = ["winbase", "memoryapi", "errhandlingapi", "sysinfoapi"] }
 
 [[bench]]
 name = "switcheroo_benchmark"

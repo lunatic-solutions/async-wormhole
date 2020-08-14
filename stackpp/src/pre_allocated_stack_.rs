@@ -36,9 +36,9 @@ pub struct PreAllocatedStack {
 impl Stack for PreAllocatedStack {
     fn new(total_size: usize) -> Result<Self, Error> {
         unsafe {
-            // Add 2 extra guard pages at the top of the stack if we use the whole size, so that there
-            // is enough stack for the exception handler on windows.
-            let total_size = total_size + 2 * page_size();
+            // Add 4 extra pages at the top of the stack if we use the whole size, so that there
+            // is enough stack for the exception handler on windows to use if we reach the limit.
+            let total_size = total_size + 4 * page_size();
             let guard_top = Self::alloc(total_size)?;
             let bottom = guard_top.add(total_size);
             let top = Self::extend_usable(bottom, page_size())?;
@@ -71,6 +71,14 @@ impl Stack for PreAllocatedStack {
 
     fn bottom(&self) -> *mut u8 {
         self.bottom
+    }
+
+    fn top(&self) -> *mut u8 {
+        self.top
+    }
+
+    fn guard_top(&self) -> *mut u8 {
+        self.guard_top
     }
 
     fn give_to_signal(self) {
@@ -124,31 +132,33 @@ impl Stack for PreAllocatedStack {
         })
     }
     #[cfg(target_family = "windows")]
-    unsafe extern "system" fn signal_handler(exception_info: winapi::um::winnt::PEXCEPTION_POINTERS) -> bool {
-        use winapi::um::minwinbase::EXCEPTION_GUARD_PAGE;
+    unsafe extern "system" fn signal_handler(_exception_info: winapi::um::winnt::PEXCEPTION_POINTERS) -> bool {
+        false // No op on windows
 
-        let record = &*(*exception_info).ExceptionRecord;
-        if record.ExceptionCode != EXCEPTION_GUARD_PAGE {
-            return false;
-        }
+        // use winapi::um::minwinbase::EXCEPTION_GUARD_PAGE;
 
-        CURRENT_STACK.with(|stack| {
-            // The second element of ExceptionInformation contains the address of the violation
-            let si_addr = record.ExceptionInformation[1];
-            let mut stack = match stack.take() {
-                Some(stack) => stack,
-                None => panic!("Stack's signal handler can't find a stack"),
-            };
-            if stack.stack_pointer_inside_guard(si_addr as *mut u8) {
-                let result = stack.grow();
-                if result.is_ok() {
-                    stack.give_to_signal();
-                    return true;
-                }
-            }
-            stack.give_to_signal();
-            return false;
-        })
+        // let record = &*(*exception_info).ExceptionRecord;
+        // if record.ExceptionCode != EXCEPTION_GUARD_PAGE {
+        //     return false;
+        // }
+
+        // CURRENT_STACK.with(|stack| {
+        //     // The second element of ExceptionInformation contains the address of the violation
+        //     let si_addr = record.ExceptionInformation[1];
+        //     let mut stack = match stack.take() {
+        //         Some(stack) => stack,
+        //         None => panic!("Stack's signal handler can't find a stack"),
+        //     };
+        //     if stack.stack_pointer_inside_guard(si_addr as *mut u8) {
+        //         let result = stack.grow();
+        //         if result.is_ok() {
+        //             stack.give_to_signal();
+        //             return true;
+        //         }
+        //     }
+        //     stack.give_to_signal();
+        //     return false;
+        // })
     }
 
 }
@@ -195,9 +205,9 @@ impl PreAllocatedStack {
 impl PreAllocatedStack {
     unsafe fn alloc(size: usize) -> Result<*mut u8, Error> {
         use winapi::um::memoryapi::VirtualAlloc;
-        use winapi::um::winnt::{MEM_RESERVE, PAGE_GUARD, PAGE_READONLY};
+        use winapi::um::winnt::{MEM_RESERVE, PAGE_GUARD, PAGE_READWRITE};
 
-        let ptr = VirtualAlloc(ptr::null_mut(), size, MEM_RESERVE, PAGE_GUARD | PAGE_READONLY);
+        let ptr = VirtualAlloc(ptr::null_mut(), size, MEM_RESERVE, PAGE_GUARD | PAGE_READWRITE);
         if ptr.is_null() {
             Err(Error::last_os_error())
         } else {
