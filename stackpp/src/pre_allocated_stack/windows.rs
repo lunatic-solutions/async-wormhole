@@ -45,12 +45,6 @@ impl Stack for PreAllocatedStack {
         self.guard_top
     }
 
-    /// noop on Windows
-    fn give_to_signal(self) {}
-
-    /// noop on Windows
-    fn take_from_signal() -> Option<Self> { None }
-
     /// Windows keep moving the guard page automatically and re-running the instruction, so there is nothing
     /// for us to do here:
     // https://docs.microsoft.com/en-us/cpp/build/stack-usage?view=vs-2019

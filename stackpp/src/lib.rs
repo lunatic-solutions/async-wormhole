@@ -19,9 +19,11 @@ pub trait Stack: Sized {
 
     /// Consumes the stack and make it available inside the signal handler.
     /// Should be called after we got a pointer to the bottom.
+    #[cfg(target_family = "unix")]
     fn give_to_signal(self);
 
     /// Get the stack back from the signal handler.
+    #[cfg(target_family = "unix")]
     fn take_from_signal() -> Option<Self>;
 
     /// Handle signals to check for stack oveflows and extend the stack if necessary.

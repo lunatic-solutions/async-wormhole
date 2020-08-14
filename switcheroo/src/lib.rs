@@ -51,8 +51,10 @@ where
     pub fn resume(&mut self, input: Input) -> Option<Output> {
         let stack = self.stack.take();
         debug_assert!(stack.is_some());
-        stack.unwrap().give_to_signal();
+        #[cfg(target_family = "unix")]
+        stack.unwrap().give_to_signal(); // Unix only
         let (data_out, stack_ptr) = unsafe { arch::swap(&input as *const Input as usize, self.stack_ptr) };
+        #[cfg(target_family = "unix")] // Unix only
         let stack = Stack::take_from_signal();
         debug_assert!(stack.is_some());
         self.stack = Some(stack.unwrap());
