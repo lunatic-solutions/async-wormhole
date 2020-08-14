@@ -155,7 +155,7 @@ impl PreAllocatedStack {
     }
 
     /// Doubles the usable stack size if possible.
-    fn grow(&mut self) -> Result<(), Error> {
+    pub fn grow(&mut self) -> Result<(), Error> {
         let usable_size = unsafe { self.bottom.sub(self.top as usize) as usize };
         let total_size = unsafe { self.bottom.sub(self.guard_top as usize) as usize };
 

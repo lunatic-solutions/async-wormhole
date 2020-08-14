@@ -8,4 +8,5 @@ fn main() {
         42
     }).unwrap();
     let output = futures::executor::block_on(task);
+    assert_eq!(output, 42);
 }
