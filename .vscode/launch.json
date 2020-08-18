@@ -1,0 +1,162 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'async_wormhole'",
+      "cargo": {
+        "args": ["test", "--no-run", "--lib", "--package=async_wormhole"],
+        "filter": {
+          "name": "async_wormhole",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'async_test'",
+      "cargo": {
+        "args": ["test", "--no-run", "--test=async_test", "--package=async_wormhole"],
+        "filter": {
+          "name": "async_test",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug benchmark 'async_benchmark'",
+      "cargo": {
+        "args": ["test", "--no-run", "--bench=async_benchmark", "--package=async_wormhole"],
+        "filter": {
+          "name": "async_benchmark",
+          "kind": "bench"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'stackpp'",
+      "cargo": {
+        "args": ["test", "--no-run", "--lib", "--package=stackpp"],
+        "filter": {
+          "name": "stackpp",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'pre_allocated_stack_test'",
+      "cargo": {
+        "args": ["test", "--no-run", "--test=pre_allocated_stack_test", "--package=stackpp"],
+        "filter": {
+          "name": "pre_allocated_stack_test",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug benchmark 'stackpp_benchmark'",
+      "cargo": {
+        "args": ["test", "--no-run", "--bench=stackpp_benchmark", "--package=stackpp"],
+        "filter": {
+          "name": "stackpp_benchmark",
+          "kind": "bench"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'switcheroo'",
+      "cargo": {
+        "args": ["test", "--no-run", "--lib", "--package=switcheroo"],
+        "filter": {
+          "name": "switcheroo",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'switch_test'",
+      "cargo": {
+        "args": ["test", "--no-run", "--test=switch_test", "--package=switcheroo"],
+        "filter": {
+          "name": "switch_test",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug benchmark 'switcheroo_benchmark'",
+      "cargo": {
+        "args": ["test", "--no-run", "--bench=switcheroo_benchmark", "--package=switcheroo"],
+        "filter": {
+          "name": "switcheroo_benchmark",
+          "kind": "bench"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'example'",
+      "cargo": {
+        "args": ["build", "--bin=example", "--package=example"],
+        "filter": {
+          "name": "example",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'example'",
+      "cargo": {
+        "args": ["test", "--no-run", "--bin=example", "--package=example"],
+        "filter": {
+          "name": "example",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

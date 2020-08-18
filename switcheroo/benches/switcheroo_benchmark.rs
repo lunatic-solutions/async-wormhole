@@ -1,23 +1,16 @@
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 use stackpp::*;
 
 use switcheroo::Generator;
 
 fn switcheroo(c: &mut Criterion) {
-    c.bench_function("switch between stacks", |b| {
-        b.iter_batched_ref(
-            || {
-                let stack = PreAllocatedStack::new(1 * 1024 * 1024).unwrap();
-                Generator::new(stack, |yielder, input| {
-                    yielder.suspend(Some(input + 1));
-                })
-            },
-            |generator| {
-                generator.resume(2)
-            },
-            BatchSize::SmallInput,
-        )
+    c.bench_function("switch stacks", |b| {
+        let stack = EightMbStack::new().unwrap();
+        let mut gen = Generator::new(stack, |yielder, input| {
+            yielder.suspend(Some(input + 1));
+        });
+        b.iter(|| gen.resume(2))
     });
 }
 

@@ -50,7 +50,7 @@ pub unsafe fn init<S: stackpp::Stack>(stack: &S, f: unsafe extern "C" fn(usize, 
     // There are a few pages between the limit and here for the exception handler to have enough stack in case
     // of a stack overflow exception.
     let bottom = bottom.offset(-1);
-    *bottom = stack.guard_top() as usize;
+    *bottom = stack.deallocation() as usize;
 
     bottom as *mut u8
 }

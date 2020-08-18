@@ -2,20 +2,20 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use async_wormhole::AsyncWormhole;
 
-
 fn async_bench(c: &mut Criterion) {
     c.bench_function("async switch", |b| {
-        b.iter_batched_ref(
+        b.iter_batched(
             || {
-                AsyncWormhole::new(|_yielder| {
-                    42
+                AsyncWormhole::new(|mut yielder| {
+                    yielder.async_suspend(async { 42 } );
                 }).unwrap()
             },
-            |task| {
-                futures::executor::block_on(task)
+            |mut task| {
+                futures::executor::block_on(&mut task);
+                task
             },
             BatchSize::SmallInput,
-        )
+        );
     });
 }
 

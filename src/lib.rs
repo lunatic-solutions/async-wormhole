@@ -1,7 +1,6 @@
 use switcheroo::Generator;
 use switcheroo::Yielder;
-use stackpp::pre_allocated_stack::PreAllocatedStack;
-use stackpp::Stack;
+use stackpp::*;
 
 use std::future::Future;
 use std::pin::Pin;
@@ -10,15 +9,17 @@ use std::task::Context;
 use std::task::Waker;
 use std::io::Error;
 
+/// TODO: If poll finishes until completion the future should maybe return the last value.
+/// But actually polling an already finished future is UB, so nothing really we need to do here.
 pub struct AsyncWormhole<'a, Output> {
-    generator: Generator<'a, std::task::Waker, Output, PreAllocatedStack>,
+    generator: Generator<'a, std::task::Waker, Output, EightMbStack>,
 }
 
 impl <'a, Output> AsyncWormhole<'a, Output> {
     pub fn new<F>(f: F) -> Result<Self, Error>
         where F: FnOnce(AsyncYielder<Output>) -> Output + 'a {
 
-        let stack = PreAllocatedStack::new(1 * 1024 * 1024)?; // 1 Mb
+        let stack = EightMbStack::new()?;
         let generator = Generator::new(stack, |yielder, waker| {
             let async_yielder = AsyncYielder::new(yielder, waker);
             yielder.suspend(Some(f(async_yielder)));

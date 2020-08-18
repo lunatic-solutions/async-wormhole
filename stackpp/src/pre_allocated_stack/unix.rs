@@ -2,6 +2,8 @@ use std::cell::Cell;
 use std::io::{Error, ErrorKind};
 use std::ptr;
 
+use libc::{mmap, mprotect, MAP_ANON, MAP_FAILED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE, PROT_NONE}; 
+
 use crate::Stack;
 use super::page_size;
 
@@ -41,7 +43,8 @@ impl Stack for PreAllocatedStack {
             let total_size = total_size + page_size();
             let guard_top = Self::alloc(total_size)?;
             let bottom = guard_top.add(total_size);
-            let top = Self::extend_usable(bottom, page_size())?;
+            // let top = Self::extend_usable(bottom, page_size())?;
+            let top = Self::extend_usable(guard_top, page_size())?;
             Ok(Self {
                 guard_top,
                 top,
@@ -115,12 +118,10 @@ impl Stack for PreAllocatedStack {
 
 impl PreAllocatedStack { 
     unsafe fn alloc(size: usize) -> Result<*mut u8, Error> {
-        use libc::{mmap, MAP_ANON, MAP_FAILED, MAP_NORESERVE, MAP_PRIVATE, PROT_NONE}; 
-
         let ptr = mmap(
             ptr::null_mut(),
             size,
-            PROT_NONE,
+            PROT_READ | PROT_WRITE,
             MAP_PRIVATE | MAP_ANON | MAP_NORESERVE,
             -1,
             0,
@@ -135,15 +136,13 @@ impl PreAllocatedStack {
     /// Mark the bottom part between `top` and `top_guard` writable.
     /// Notice that when a new stack is allocated, bottom and top are at the same address;
     unsafe fn extend_usable(top: *mut u8, size: usize) -> Result<*mut u8, Error> {
-        use libc::{mprotect, PROT_READ, PROT_WRITE};
-
         if mprotect(
-            top.sub(size) as *mut libc::c_void,
+            top as *mut libc::c_void,
             size,
-            PROT_READ | PROT_WRITE,
+            PROT_NONE,
         ) == 0
         {
-            Ok(top.sub(size))
+            Ok(top.add(size))
         } else {
             Err(Error::last_os_error())
         }

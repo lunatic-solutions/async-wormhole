@@ -1,4 +1,4 @@
-#![feature(asm)]
+#![feature(asm, llvm_asm, naked_functions)]
 
 mod arch;
 
@@ -6,8 +6,8 @@ use std::marker::PhantomData;
 use std::cell::Cell;
 
 pub struct Generator<'a, Input: 'a, Output: 'a, Stack: stackpp::Stack> {
-    stack: Option<Stack>,
-    stack_ptr: *mut u8,
+    stack: Stack,
+    stack_ptr: *mut usize,
     phantom: PhantomData<(&'a (), *mut Input, *const Output)>,
 }
 
@@ -21,7 +21,7 @@ where
     where
         F: FnOnce(&Yielder<Input, Output>, Input) + 'a,
     {
-        unsafe extern "C" fn generator_wrapper<Input, Output, Stack, F>(f_ptr: usize, stack_ptr: *mut u8) -> !
+        unsafe extern "C" fn generator_wrapper<Input, Output, Stack, F>(f_ptr: usize, stack_ptr: *mut usize) -> !
             where Stack: stackpp::Stack,
                   F: FnOnce(&Yielder<Input, Output>, Input)
         {
@@ -35,13 +35,15 @@ where
         }
 
         let stack_ptr = unsafe { arch::init(&stack, generator_wrapper::<Input, Output, Stack, F>) };
-        let stack_ptr = unsafe { arch::swap(&f as *const F as usize, stack_ptr).1 };
+        let stack_ptr = unsafe {
+            arch::swap_and_link_stacks(&f as *const F as usize, stack_ptr, stack.bottom()).1
+        };
         // We can't drop f when returning from this function. Maybe store it inside the Generator struct so it
         // doesn't get dropped before the generator.
         std::mem::forget(f);
 
         Generator {
-            stack: Some(stack),
+            stack,
             stack_ptr,
             phantom: PhantomData,
         }
@@ -49,28 +51,24 @@ where
 
     #[inline(always)]
     pub fn resume(&mut self, input: Input) -> Option<Output> {
-        let stack = self.stack.take();
-        debug_assert!(stack.is_some());
-        #[cfg(target_family = "unix")]
-        stack.unwrap().give_to_signal(); // Unix only
-        let (data_out, stack_ptr) = unsafe { arch::swap(&input as *const Input as usize, self.stack_ptr) };
-        #[cfg(target_family = "unix")] // Unix only
-        let stack = Stack::take_from_signal();
-        debug_assert!(stack.is_some());
-        self.stack = Some(stack.unwrap());
+
+        let (data_out, stack_ptr) = unsafe {
+            arch::swap_and_link_stacks(&input as *const Input as usize, self.stack_ptr, self.stack.bottom())
+        };
         self.stack_ptr = stack_ptr;
+
         std::mem::forget(input);
         unsafe { std::ptr::read(data_out as *const Option<Output>) }
     }
 }
 
 pub struct Yielder<Input, Output> {
-    stack_ptr: Cell<*mut u8>,
+    stack_ptr: Cell<*mut usize>,
     phantom: PhantomData<(*const Input, *mut Output)>,
 }
 
 impl<Input, Output> Yielder<Input, Output> {
-    fn new(stack_ptr: *mut u8) -> Yielder<Input, Output> {
+    fn new(stack_ptr: *mut usize) -> Yielder<Input, Output> {
         Yielder {
             stack_ptr: Cell::new(stack_ptr),
             phantom: PhantomData
