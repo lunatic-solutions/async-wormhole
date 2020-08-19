@@ -10,6 +10,7 @@ fn switch_stack() {
             input = yielder.suspend(Some(input + 1));
         }
     });
+    println!("Hello");
     assert_eq!(add_one.resume(2), Some(3));
     assert_eq!(add_one.resume(127), Some(128));
     assert_eq!(add_one.resume(-1), Some(0));
@@ -25,7 +26,7 @@ fn extend_small_stack() {
         yielder.suspend(Some(0));
     });
     // This will use more than the first 4Kb allocated to the stack;
-    blow_stack.resume(70_000);
+    blow_stack.resume(9000);
 }
 
 fn rec(n: u64) -> u64 {

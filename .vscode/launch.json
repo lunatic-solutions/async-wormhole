@@ -89,17 +89,11 @@
       "cwd": "${workspaceFolder}"
     },
     {
-      "type": "lldb",
+      "type": "cppvsdbg",
       "request": "launch",
       "name": "Debug unit tests in library 'switcheroo'",
-      "cargo": {
-        "args": ["test", "--no-run", "--lib", "--package=switcheroo"],
-        "filter": {
-          "name": "switcheroo",
-          "kind": "lib"
-        }
-      },
-      "args": [],
+      "program": "${workspaceRoot}/target/debug/deps/switch_test-ffb682687dd245d4.exe",
+      "args": ["--nocapture"],
       "cwd": "${workspaceFolder}"
     },
     {

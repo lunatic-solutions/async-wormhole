@@ -14,6 +14,7 @@ pub struct PreAllocatedStack {
 }
 
 impl Stack for PreAllocatedStack {
+   
     fn new(total_size: usize) -> Result<Self, Error> {
         unsafe {
             // Add 4 extra pages at the top of the stack if we use up the whole size, so there is enough
@@ -32,6 +33,7 @@ impl Stack for PreAllocatedStack {
             })
         }
     }
+    
 
     fn bottom(&self) -> *mut u8 {
         self.bottom
@@ -95,5 +97,3 @@ impl Drop for PreAllocatedStack {
         debug_assert_ne!(result, 0);
     }
 }
-
-
