@@ -1,12 +1,15 @@
+use switcheroo::stack::*;
 use switcheroo::Generator;
-use stackpp::*;
 
 #[test]
 fn switch_stack() {
     let stack = EightMbStack::new().unwrap();
     let mut add_one = Generator::new(stack, |yielder, mut input| {
+        println!("Sometimes println doesn't touch all pages on windows");
         loop {
-            if input == 0 { break }
+            if input == 0 {
+                break;
+            }
             input = yielder.suspend(Some(input + 1));
         }
     });
@@ -24,15 +27,16 @@ fn extend_small_stack() {
         rec(input);
         yielder.suspend(Some(0));
     });
-    // This will use more than the first 4Kb commited memory on Windows
-    blow_stack.resume(10_000);
+    // This will use 7 Mb of stack, more than the first 4 Kb commited memory on Windows
+    blow_stack.resume(7_000);
 }
 
-fn rec(n: u64) -> u64 {
-  let x: [u64; 64] = [1; 64];
-  if n < 1 {
-      x[0]
-  } else {
-      rec(n - 1)
-  }
+// Uses 1 Kb per iteration
+fn rec(n: u64) -> u8 {
+    let x: [u8; 1024] = [1; 1024];
+    if n < 1 {
+        x[0]
+    } else {
+        rec(n - 1)
+    }
 }

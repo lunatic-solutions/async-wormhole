@@ -1,3 +1,5 @@
+use crate::stack;
+
 /// After the call to this function the stack should look like this:\
 /// * Deallocation stack.
 /// * Stack limit.
@@ -16,7 +18,10 @@
 /// Returns a pointer to the new top of the stack.
 /// The `swap` function will pop the first few values to set up the Thread Information Block and function
 /// call.
-pub unsafe fn init<S: stackpp::Stack>(stack: &S, f: unsafe extern "C" fn(usize, *mut usize) -> !) -> *mut usize {
+pub unsafe fn init<S: stack::Stack>(
+    stack: &S,
+    f: unsafe extern "C" fn(usize, *mut usize) -> !,
+) -> *mut usize {
     unsafe fn push(mut sp: *mut usize, val: usize) -> *mut usize {
         sp = sp.offset(-1);
         *sp = val;
@@ -26,18 +31,15 @@ pub unsafe fn init<S: stackpp::Stack>(stack: &S, f: unsafe extern "C" fn(usize, 
     let mut sp = stack.bottom();
     // Add 2 slots of shadow stack on Windows + align stack. With the other arguments pushed later
     // this will result in actually 4 slots of shadow stack, as required by Windwos.
-    for _ in 0..3 { sp = push(sp, 0); }
+    for _ in 0..3 {
+        sp = push(sp, 0);
+    }
     // Save the function on the stack that is going to be called by ``
     sp = push(sp, f as usize);
 
     #[naked]
     unsafe extern "C" fn trampoline_1() {
-        asm!(
-            // ".cfi_def_cfa rbp, 16",
-            // ".cfi_offset rbp, -16",
-            "nop",
-            "nop",
-        )
+        asm!("nop", "nop",)
     }
 
     // Call frame for trampoline_2. The CFA slot is updated by swap_and_link function
@@ -47,12 +49,7 @@ pub unsafe fn init<S: stackpp::Stack>(stack: &S, f: unsafe extern "C" fn(usize, 
 
     #[naked]
     unsafe extern "C" fn trampoline_2() {
-        asm!(
-            // ".cfi_def_cfa rbp, 16",
-            // ".cfi_offset rbp, -16",
-            "nop",
-            "call [rsp + 16]"
-        )
+        asm!("nop", "call [rsp + 16]",)
     }
 
     // Save frame pointer

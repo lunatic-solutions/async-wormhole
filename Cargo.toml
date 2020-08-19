@@ -8,7 +8,6 @@ edition = "2018"
 
 [dependencies]
 pin-utils = "0.1"
-stackpp = {path = "./stackpp"}
 switcheroo = {path = "./switcheroo"}
 
 [dev-dependencies]
@@ -23,7 +22,6 @@ harness = false
 [workspace]
 members = [
   ".",
-  "stackpp",
   "switcheroo",
   "example"
 ]

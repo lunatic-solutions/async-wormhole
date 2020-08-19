@@ -1,10 +1,12 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use stackpp::*;
-
+use switcheroo::stack::*;
 use switcheroo::Generator;
 
 fn switcheroo(c: &mut Criterion) {
+    // Bench allocation
+    c.bench_function("create 8 MB stack", |b| b.iter(|| EightMbStack::new()));
+
     c.bench_function("switch stacks", |b| {
         let stack = EightMbStack::new().unwrap();
         let mut gen = Generator::new(stack, |yielder, input| {
