@@ -1,4 +1,6 @@
-pub unsafe fn init<S: stackpp::Stack>(
+use crate::stack;
+
+pub unsafe fn init<S: stack::Stack>(
     stack: &S,
     f: unsafe extern "C" fn(usize, *mut usize) -> !,
 ) -> *mut usize {
