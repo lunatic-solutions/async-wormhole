@@ -6,9 +6,7 @@ fn main() {
         let y = yielder.async_suspend(async { true });
         assert_eq!(y, true);
         42
-    })
-    .unwrap();
-    let x = 88;
+    }).unwrap();
     let output = futures::executor::block_on(task);
     assert_eq!(output, 42);
 }
