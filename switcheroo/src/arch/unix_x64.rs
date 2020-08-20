@@ -76,11 +76,11 @@ pub unsafe fn swap_and_link_stacks(
         "1337:",
         // Mark all registers as clobbered as we don't know what the code we are jumping to is going to use.
         // The compiler will optimise this out and just save the registers it actually knows it must.
-        in("rcx") cfa_of_caller,
-        in("rdx") new_sp,
+        inout("rcx") cfa_of_caller => _,
+        inout("rdx") new_sp => _,
         inout("rdi") arg => ret_val, // 1st argument to called function
         out("rsi") ret_sp, // 2nd argument to called function
-        out("rax") _, out("rbx") _, lateout("rcx") _, lateout("rdx") _,
+        out("rax") _, out("rbx") _,
 
         out("r8") _, out("r9") _, out("r10") _, out("r11") _,
         out("r12") _, out("r13") _, out("r14") _, out("r15") _,
@@ -128,10 +128,10 @@ pub unsafe fn swap(arg: usize, new_sp: *mut usize) -> (usize, *mut usize) {
         "1337:",
         // Mark all registers as clobbered as we don't know what the code we are jumping to is going to use.
         // The compiler will optimise this out and just save the registers it actually knows it must.
-        in("rdx") new_sp,
+        inout("rdx") new_sp => _,
         inout("rdi") arg => ret_val, // 1st argument to called function
         out("rsi") ret_sp, // 2nd argument to called function
-        out("rax") _, out("rbx") _, out("rcx") _, lateout("rdx") _,
+        out("rax") _, out("rbx") _, out("rcx") _,
 
         out("r8") _, out("r9") _, out("r10") _, out("r11") _,
         out("r12") _, out("r13") _, out("r14") _, out("r15") _,
