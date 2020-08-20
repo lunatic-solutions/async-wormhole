@@ -40,3 +40,14 @@ fn rec(n: u64) -> u8 {
         rec(n - 1)
     }
 }
+
+
+#[test]
+#[should_panic]
+fn panic_on_different_stack() {
+    let stack = EightMbStack::new().unwrap();
+    let mut add_one = Generator::new(stack, |_yielder, mut _input| {
+        panic!("Ups");
+    });
+    let _: u32 = add_one.resume(0).unwrap();
+}

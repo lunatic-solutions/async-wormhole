@@ -58,17 +58,16 @@ where
 
     #[inline(always)]
     pub fn resume(&mut self, input: Input) -> Option<Output> {
-        let (data_out, stack_ptr) = unsafe {
-            arch::swap_and_link_stacks(
+        unsafe {
+            let (data_out, stack_ptr) = arch::swap_and_link_stacks(
                 &input as *const Input as usize,
                 self.stack_ptr,
                 self.stack.bottom(),
-            )
-        };
-        self.stack_ptr = stack_ptr;
-
-        std::mem::forget(input);
-        unsafe { std::ptr::read(data_out as *const Option<Output>) }
+            );
+            self.stack_ptr = stack_ptr;
+            std::mem::forget(input);
+            std::ptr::read(data_out as *const Option<Output>)
+        }
     }
 }
 

@@ -43,7 +43,6 @@ impl Stack for EightMbStack {
 
     #[cfg(target_family = "unix")]
     fn bottom(&self) -> *mut usize {
-        // The `add(size)` function for type T adds `size * size_of(T)` bytes to the pointer.
         unsafe { self.0.add(EIGHT_MB / size_of::<usize>()) }
     }
     #[cfg(target_family = "unix")]
@@ -114,7 +113,7 @@ impl Stack for EightMbStack {
 #[cfg(target_family = "unix")]
 impl Drop for EightMbStack {
     fn drop(&mut self) {
-        let result = unsafe { libc::munmap(self.top() as *mut libc::c_void, EIGHT_MB) };
+        let result = unsafe { libc::munmap(self.0 as *mut libc::c_void, EIGHT_MB) };
         debug_assert_eq!(result, 0);
     }
 }

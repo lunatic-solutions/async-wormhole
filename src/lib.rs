@@ -9,8 +9,6 @@ use std::task::Context;
 use std::task::Poll;
 use std::task::Waker;
 
-/// TODO: If poll finishes until completion the future should maybe return the last value.
-/// But actually polling an already finished future is UB, so nothing really we need to do here.
 pub struct AsyncWormhole<'a, Output> {
     generator: Generator<'a, std::task::Waker, Output, EightMbStack>,
 }
