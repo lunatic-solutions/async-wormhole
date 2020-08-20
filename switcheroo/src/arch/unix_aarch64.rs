@@ -75,7 +75,6 @@ pub unsafe fn swap_and_link_stacks(
         inout("x2") new_sp => _,
         inout("x0") arg => ret_val,
         out("x1") ret_sp,
-        lateout("x2") _, lateout("x3") _,
 
         out("x4") _, out("x5") _, out("x6") _, out("x7") _,
         out("x8") _, out("x9") _, out("x10") _, out("x11") _,
@@ -83,9 +82,6 @@ pub unsafe fn swap_and_link_stacks(
         out("x16") _, out("x17") _, out("x18") _, out("x19") _,
         out("x20") _, out("x21") _, out("x22") _, out("x23") _,
         out("x24") _, out("x25") _, out("x26") _, out("x27") _,
-        out("x28") _,
-        
-        out("lr") _,
     );
 
     (ret_val, ret_sp)
@@ -116,8 +112,6 @@ pub unsafe fn swap(arg: usize, new_sp: *mut usize) -> (usize, *mut usize) {
         out("x20") _, out("x21") _, out("x22") _, out("x23") _,
         out("x24") _, out("x25") _, out("x26") _, out("x27") _,
         out("x28") _,
-        
-        out("lr") _,
     );
 
     (ret_val, ret_sp)
