@@ -9,11 +9,11 @@ fn async_yield() {
         let y = yielder.async_suspend(async { true });
         assert_eq!(y, true);
         42
-    }).unwrap();
+    })
+    .unwrap();
     let output = futures::executor::block_on(task);
-    assert_eq!(output, 42);
+    assert_eq!(output.unwrap(), 42);
 }
-
 
 #[test]
 #[should_panic]
@@ -24,6 +24,7 @@ fn async_yield_panics() {
         let y = yielder.async_suspend(async { true });
         assert_eq!(y, true);
         panic!();
-    }).unwrap();
+    })
+    .unwrap();
     futures::executor::block_on(task);
 }

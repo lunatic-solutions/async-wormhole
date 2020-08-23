@@ -2,7 +2,7 @@ use crate::stack;
 
 pub unsafe fn init<S: stack::Stack>(
     stack: &S,
-    f: unsafe extern "C" fn(usize, *mut usize) -> !,
+    f: unsafe extern "C" fn(usize, *mut usize),
 ) -> *mut usize {
     unsafe fn push(mut sp: *mut usize, val: usize) -> *mut usize {
         sp = sp.offset(-1);
@@ -50,8 +50,6 @@ pub unsafe fn swap_and_link_stacks(
     new_sp: *mut usize,
     sp: *const usize,
 ) -> (usize, *mut usize) {
-    let cfa_of_caller = sp.offset(-4);
-
     let ret_val: usize;
     let ret_sp: *mut usize;
 
@@ -61,8 +59,8 @@ pub unsafe fn swap_and_link_stacks(
         "push rax",
         // Save the frame pointer as it can't be marked as an output register.
         "push rbp",
-        // Link stacks
-        "mov [rcx], rsp",
+        // Link stacks by swapping the CFA value
+        "mov [rcx-32], rsp",
         // Set the current pointer as the 2nd element (rsi) of the function we are jumping to.
         "mov rsi, rsp",
         // Change the stack pointer to the passed value.
@@ -76,7 +74,7 @@ pub unsafe fn swap_and_link_stacks(
         "1337:",
         // Mark all registers as clobbered as we don't know what the code we are jumping to is going to use.
         // The compiler will optimise this out and just save the registers it actually knows it must.
-        inout("rcx") cfa_of_caller => _,
+        inout("rcx") sp => _,
         inout("rdx") new_sp => _,
         inout("rdi") arg => ret_val, // 1st argument to called function
         out("rsi") ret_sp, // 2nd argument to called function

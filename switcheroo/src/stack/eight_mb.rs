@@ -10,7 +10,9 @@ use winapi::ctypes::c_void;
 #[cfg(target_family = "windows")]
 use winapi::um::memoryapi::{VirtualAlloc, VirtualFree, VirtualProtect};
 #[cfg(target_family = "windows")]
-use winapi::um::winnt::{MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_GUARD, PAGE_READWRITE, PAGE_NOACCESS};
+use winapi::um::winnt::{
+    MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_GUARD, PAGE_NOACCESS, PAGE_READWRITE,
+};
 
 use super::Stack;
 
@@ -83,7 +85,7 @@ impl Stack for EightMbStack {
 
             let old_protect: u32 = 0;
             let bottom_1 = VirtualProtect(
-                ptr.add((EIGHT_MB + EXCEPTION_ZONE - 1 * 4096) / size_of::<usize>())  as *mut c_void,
+                ptr.add((EIGHT_MB + EXCEPTION_ZONE - 1 * 4096) / size_of::<usize>()) as *mut c_void,
                 1 * 4096,
                 PAGE_READWRITE,
                 &old_protect as *const u32 as *mut u32,

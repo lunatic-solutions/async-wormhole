@@ -10,7 +10,7 @@ fn switch_stack() {
             if input == 0 {
                 break;
             }
-            input = yielder.suspend(Some(input + 1));
+            input = yielder.suspend(input + 1);
         }
     });
     assert_eq!(add_one.resume(2), Some(3));
@@ -40,7 +40,6 @@ fn rec(n: u64) -> u8 {
         rec(n - 1)
     }
 }
-
 
 #[test]
 #[should_panic]

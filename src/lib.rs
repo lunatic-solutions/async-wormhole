@@ -10,7 +10,7 @@ use std::task::Poll;
 use std::task::Waker;
 
 pub struct AsyncWormhole<'a, Output> {
-    generator: Generator<'a, std::task::Waker, Output, EightMbStack>,
+    generator: Generator<'a, std::task::Waker, Option<Output>, EightMbStack>,
 }
 
 impl<'a, Output> AsyncWormhole<'a, Output> {
@@ -29,7 +29,7 @@ impl<'a, Output> AsyncWormhole<'a, Output> {
 }
 
 impl<'a, Output> Future for AsyncWormhole<'a, Output> {
-    type Output = Output;
+    type Output = Option<Output>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         match self.generator.resume(cx.waker().clone()) {
@@ -40,12 +40,12 @@ impl<'a, Output> Future for AsyncWormhole<'a, Output> {
 }
 
 pub struct AsyncYielder<'a, Output> {
-    yielder: &'a Yielder<Waker, Output>,
+    yielder: &'a Yielder<Waker, Option<Output>>,
     waker: Waker,
 }
 
 impl<'a, Output> AsyncYielder<'a, Output> {
-    pub(crate) fn new(yielder: &'a Yielder<Waker, Output>, waker: Waker) -> Self {
+    pub(crate) fn new(yielder: &'a Yielder<Waker, Option<Output>>, waker: Waker) -> Self {
         Self { yielder, waker }
     }
 
