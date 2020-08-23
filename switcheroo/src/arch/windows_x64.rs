@@ -106,7 +106,7 @@ pub unsafe fn swap_and_link_stacks(
         "push rax",
 
         // Link stacks
-        "mov [rdi-48], rsp",
+        "mov [rdi - 48], rsp",
 
         // Set the current pointer as the 2nd element (rdx) of the function we are jumping to.
         "mov rdx, rsp",
@@ -132,8 +132,8 @@ pub unsafe fn swap_and_link_stacks(
         "1337:",
         // Mark all registers as clobbered as we don't know what the code we are jumping to is going to use.
         // The compiler will optimise this out and just save the registers it actually knows it must.
-        in("rdi") sp => _,
-        in("rsi") new_sp => _,
+        inout("rdi") sp => _,
+        inout("rsi") new_sp => _,
         inout("rcx") arg => ret_val, // 1st argument to called function
         out("rdx") ret_sp, // 2nd argument to called function
         out("rax") _, out("rbx") _,
@@ -198,7 +198,7 @@ pub unsafe fn swap(arg: usize, new_sp: *mut usize) -> (usize, *mut usize) {
         "1337:",
         // Mark all registers as clobbered as we don't know what the code we are jumping to is going to use.
         // The compiler will optimise this out and just save the registers it actually knows it must.
-        in("rsi") new_sp => _,
+        inout("rsi") new_sp => _,
         inout("rcx") arg => ret_val, // 1st argument to called function
         out("rdx") ret_sp, // 2nd argument to called function
         out("rax") _, out("rbx") _, out("rdi") _,

@@ -60,7 +60,7 @@ pub unsafe fn swap_and_link_stacks(
         // Save the frame pointer as it can't be marked as an output register.
         "push rbp",
         // Link stacks by swapping the CFA value
-        "mov [rcx-32], rsp",
+        "mov [rcx - 32], rsp",
         // Set the current pointer as the 2nd element (rsi) of the function we are jumping to.
         "mov rsi, rsp",
         // Change the stack pointer to the passed value.
