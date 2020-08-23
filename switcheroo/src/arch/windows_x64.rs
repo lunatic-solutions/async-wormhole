@@ -198,7 +198,7 @@ pub unsafe fn swap(arg: usize, new_sp: *mut usize) -> (usize, *mut usize) {
         "1337:",
         // Mark all registers as clobbered as we don't know what the code we are jumping to is going to use.
         // The compiler will optimise this out and just save the registers it actually knows it must.
-        in("rsi") new_sp =>,
+        in("rsi") new_sp => _,
         inout("rcx") arg => ret_val, // 1st argument to called function
         out("rdx") ret_sp, // 2nd argument to called function
         out("rax") _, out("rbx") _, out("rdi") _,
