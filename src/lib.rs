@@ -13,6 +13,8 @@ pub struct AsyncWormhole<'a, Output> {
     generator: Generator<'a, std::task::Waker, Option<Output>, EightMbStack>,
 }
 
+unsafe impl<Output> Send for AsyncWormhole<'_, Output> {}
+
 impl<'a, Output> AsyncWormhole<'a, Output> {
     pub fn new<F>(f: F) -> Result<Self, Error>
     where
