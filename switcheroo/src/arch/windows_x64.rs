@@ -38,8 +38,16 @@ pub unsafe fn init<S: stack::Stack>(
     sp = push(sp, f as usize);
 
     #[naked]
+    #[no_mangle]
     unsafe extern "C" fn trampoline_1() {
-        asm!("nop", "nop",)
+        asm!(
+            // ".seh_proc trampoline_1",
+            // ".seh_pushreg rbp",
+            // ".seh_stackalloc 24",
+            "nop",
+            "nop",
+            // ".seh_endproc",
+        )
     }
 
     // Call frame for trampoline_2. The CFA slot is updated by swap_and_link function
@@ -48,8 +56,16 @@ pub unsafe fn init<S: stack::Stack>(
     sp = push(sp, 0xdeaddeaddead0cfa);
 
     #[naked]
+    #[no_mangle]
     unsafe extern "C" fn trampoline_2() {
-        asm!("nop", "call [rsp + 16]",)
+        asm!(
+            // ".seh_proc trampoline_2",
+            // ".seh_setframe rbp, 0",
+            // ".seh_pushreg rbp",
+            "nop",
+            "call [rsp + 16]",
+            // ".seh_endproc",
+        )
     }
 
     // Save frame pointer
