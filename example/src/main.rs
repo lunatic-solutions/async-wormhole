@@ -1,6 +1,6 @@
 use async_wormhole::AsyncWormhole;
 fn main() {
-    let task = AsyncWormhole::new(|mut yielder| {
+    let task: AsyncWormhole<i32, ()> = AsyncWormhole::new(|mut yielder| {
         let x = yielder.async_suspend(async { 5 });
         assert_eq!(x, 5);
         panic!("Will a longer panic also fail. What about a really long one.");

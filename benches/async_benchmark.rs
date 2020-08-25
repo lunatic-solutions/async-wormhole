@@ -5,20 +5,22 @@ use async_wormhole::AsyncWormhole;
 fn async_bench(c: &mut Criterion) {
     c.bench_function("async_wormhole creation", |b| {
         b.iter(|| {
-            AsyncWormhole::new(|mut yielder| {
+            let async_: AsyncWormhole<(), ()> = AsyncWormhole::new(|mut yielder| {
                 yielder.async_suspend(async { 42 });
             })
-            .unwrap()
+            .unwrap();
+            async_
         })
     });
 
     c.bench_function("async switch", |b| {
         b.iter_batched(
             || {
-                AsyncWormhole::new(|mut yielder| {
+                let async_: AsyncWormhole<(), ()> = AsyncWormhole::new(|mut yielder| {
                     yielder.async_suspend(async { 42 });
                 })
-                .unwrap()
+                .unwrap();
+                async_
             },
             |mut task| {
                 futures::executor::block_on(&mut task);
