@@ -66,7 +66,9 @@ impl<'a, Output, TLS: Unpin> Future for AsyncWormhole<'a, Output, TLS> {
         };
 
         match self.generator.get_mut().resume(cx.waker().clone()) {
-            None => {
+            // If we call the future after it completed it will always return Poll::Pending.
+            // But polling a completed future is either way undefined behaviour.
+            None | Some(None) => {
                 // Preserve any TLS value if set
                 match self.thread_local.take() {
                     None => {},
