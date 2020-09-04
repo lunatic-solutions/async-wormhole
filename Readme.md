@@ -55,7 +55,7 @@ fn main() {
 There should be almost no performance overhead to `.await` calls inside the closure passed to
 `AsyncWormhole::new` and caught by `async_suspend`.
 But instantiating a new AsyncWormhole will require one memory allocation.
-And of course you are not going to get perfectly sized stacks.
+And of course you are not going to get [perfectly sized stacks](https://without.boats/blog/futures-and-segmented-stacks/#futures-as-a-perfectly-sized-stack).
 
 ## License
 
