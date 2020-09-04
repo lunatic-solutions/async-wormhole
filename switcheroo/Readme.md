@@ -13,20 +13,20 @@ use switcheroo::stack::*;
 use switcheroo::Generator;
 
 fn  main() {
-	let stack = EightMbStack::new().unwrap();
-	let  mut add_one = Generator::new(stack, |yielder, mut input| {
-		loop {
-			if input ==  0 {
-				break;
-			}
-			input = yielder.suspend(input +  1);
-		}
-	});
+    let stack = EightMbStack::new().unwrap();
+    let  mut add_one = Generator::new(stack, |yielder, mut input| {
+        loop {
+            if input ==  0 {
+                break;
+            }
+            input = yielder.suspend(input +  1);
+        }
+    });
 
-	assert_eq!(add_one.resume(2), Some(3));
-	assert_eq!(add_one.resume(127), Some(128));
-	assert_eq!(add_one.resume(0), None);
-	assert_eq!(add_one.resume(0), None);
+    assert_eq!(add_one.resume(2), Some(3));
+    assert_eq!(add_one.resume(127), Some(128));
+    assert_eq!(add_one.resume(0), None);
+    assert_eq!(add_one.resume(0), None);
 }
 ```
 

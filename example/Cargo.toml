@@ -7,5 +7,5 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async_wormhole = {path = "./.."}
+async-wormhole = {path = "./.."}
 futures = "0.3"
