@@ -1,5 +1,7 @@
 # async-wormhole
 
+[Documentation](https://docs.rs/async-wormhole/0.1.1/async_wormhole/)
+
 > This library is still super experimental, I use it to prototype the foundation for
 > [Lunatic](https://dev.to/bkolobara/lunatic-actor-based-webassembly-runtime-for-the-backend-36oj) .
 >

@@ -1,5 +1,7 @@
 # Switcheroo
 
+[Documentation](https://docs.rs/switcheroo/0.1.1/switcheroo/)
+
 > This library is heavily inspired by https://github.com/edef1c/libfringe.
 
 > **Currently only works in Rust nightly.**
