@@ -1,12 +1,12 @@
 [package]
 name = "async-wormhole"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Bernard Kolobara <me@kolobara.com>"]
 edition = "2018"
 license = "Apache-2.0/MIT"
 description = "Async calls across non-async functions"
 readme = "Readme.md"
-repository = "https://github.com/bkolobara/async_wormhole/"
+repository = "https://github.com/bkolobara/async-wormhole/"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
