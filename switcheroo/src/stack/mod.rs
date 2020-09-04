@@ -1,6 +1,16 @@
+//! Different stack implementations (currently only contains a 8 Mb stack).
+
 mod eight_mb;
 pub use eight_mb::EightMbStack;
 
+/// An implementation of this trait will be accepted by a [generator](struct.Generator.html) as a
+/// valid Stack. Most of the functions provided here are straightforward except for
+/// [deallocation](trait.Stack.html#tymethod.deallocation), this is a Windows only construct.
+///
+/// Windows reserves a few pages above the stack top, so if a stack overflow exception is triggered
+/// the handler has still enough of stack to process it. The name comes from the fact that it
+/// points to the top most address of the memory area designated to the stack and will be used as a
+/// pointer when freeing/deallocating the stack.
 pub trait Stack: Sized {
     /// Returns a new stack.
     fn new() -> Result<Self, std::io::Error>;

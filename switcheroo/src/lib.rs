@@ -1,5 +1,34 @@
 #![feature(asm, naked_functions)]
 
+//! Switcheroo provides lightweight context switches in Rust.
+//!
+//! It consists of two parts:
+//! 1. A stack implementation (currently only providing a [fixed 8Mb stack](stack/struct.EightMbStack.html)).
+//! 2. A [generator](struct.Generator.html) implementation.
+//! ## Example
+//! ```
+//! use switcheroo::stack::*;
+//! use switcheroo::Generator;
+//!
+//! fn  main() {
+//! 	let stack = EightMbStack::new().unwrap();
+//! 	let  mut add_one = Generator::new(stack, |yielder, mut input| {
+//! 		loop {
+//! 			if input ==  0 {
+//! 				break;
+//! 			}
+//! 			input = yielder.suspend(input +  1);
+//! 		}
+//! 	});
+//!
+//! 	assert_eq!(add_one.resume(2), Some(3));
+//! 	assert_eq!(add_one.resume(127), Some(128));
+//! 	assert_eq!(add_one.resume(0), None);
+//! 	assert_eq!(add_one.resume(0), None);
+//! }
+// ```
+
+
 mod arch;
 pub mod stack;
 
@@ -7,6 +36,11 @@ use std::cell::Cell;
 use std::marker::PhantomData;
 use std::{mem, ptr};
 
+/// Generator wraps a closure and allows suspending its execution more than once, returning
+/// a value each time.
+///
+/// If the closure finishes each other call to [resume](struct.Generator.html#method.resume)
+/// will yield `None`.
 pub struct Generator<'a, Input: 'a, Output: 'a, Stack: stack::Stack> {
     stack: Stack,
     stack_ptr: Option<ptr::NonNull<usize>>,
@@ -19,6 +53,7 @@ where
     Output: 'a,
     Stack: stack::Stack,
 {
+    /// Create a new generator from a stack and closure.
     pub fn new<F>(stack: Stack, f: F) -> Generator<'a, Input, Output, Stack>
     where
         F: FnOnce(&Yielder<Input, Output>, Input) + 'a,
@@ -58,6 +93,7 @@ where
         }
     }
 
+    /// Resume the generator yielding the next value.
     #[inline(always)]
     pub fn resume(&mut self, input: Input) -> Option<Output> {
         if self.stack_ptr.is_none() {
@@ -84,6 +120,7 @@ where
     }
 }
 
+/// Yielder is an interface provided to every generator through which it returns a value.
 pub struct Yielder<Input, Output> {
     stack_ptr: Cell<*mut usize>,
     phantom: PhantomData<(*const Input, *mut Output)>,
@@ -97,6 +134,8 @@ impl<Input, Output> Yielder<Input, Output> {
         }
     }
 
+    /// Suspends the generator and returns `Some(val)` from the `resume()` invocation that resumed
+    /// the generator.
     #[inline(always)]
     pub fn suspend(&self, val: Output) -> Input {
         unsafe { self.suspend_(Some(val)) }

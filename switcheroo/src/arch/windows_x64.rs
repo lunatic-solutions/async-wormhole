@@ -1,23 +1,5 @@
 use crate::stack;
 
-/// After the call to this function the stack should look like this:\
-/// * Deallocation stack.
-/// * Stack limit.
-/// * Stack base.
-/// * Stack frame pointer. Will be overwritten by `swap_and_link`.
-/// * Pointer to the function we want to call
-/// * Return address. Can also be zero, as we never return from this stack. But the ABI expects it for
-///   alignement reasons: "the value (%rsp + 8) is always a multiple of 16 when control is transferred to
-///   the function entry point".
-/// -----------------------------------------------------------------------------------------------------
-/// *
-/// * The Home addresses are required for at least 4 arguments by Windows:
-/// * https://docs.microsoft.com/en-us/cpp/build/stack-usage?view=vs-2019
-/// *
-///
-/// Returns a pointer to the new top of the stack.
-/// The `swap` function will pop the first few values to set up the Thread Information Block and function
-/// call.
 pub unsafe fn init<S: stack::Stack>(
     stack: &S,
     f: unsafe extern "C" fn(usize, *mut usize),
@@ -30,7 +12,7 @@ pub unsafe fn init<S: stack::Stack>(
 
     let mut sp = stack.bottom();
     // Add 2 slots of shadow stack on Windows + align stack. With the other arguments pushed later
-    // this will result in actually 4 slots of shadow stack, as required by Windwos.
+    // this will result in actually 4 slots of shadow stack (home addresses), as required by Windwos.
     for _ in 0..3 {
         sp = push(sp, 0);
     }
@@ -73,7 +55,7 @@ pub unsafe fn init<S: stack::Stack>(
     sp = push(sp, trampoline_2 as usize + 1); // call instruction
     sp = push(sp, frame as usize);
 
-    // The next few values are not really documented in windows and we rely on this Wiki page:
+    // The next few values are not really documented in Windows and we rely on this Wiki page:
     // https://en.wikipedia.org/wiki/Win32_Thread_Information_Block
     // and this file from Boost's Context library:
     // https://github.com/boostorg/context/blob/develop/src/asm/jump_x86_64_ms_pe_masm.asm
@@ -82,7 +64,7 @@ pub unsafe fn init<S: stack::Stack>(
     // Stack base
     sp = push(sp, stack.bottom() as usize);
 
-    // Stack limit, 4 pages under the guard on Windows.
+    // Stack limit, 4 pages under the deallocation stack on Windows.
     sp = push(sp, stack.top() as usize);
 
     // Deallocation stack, where the actual memory address of the stack starts.

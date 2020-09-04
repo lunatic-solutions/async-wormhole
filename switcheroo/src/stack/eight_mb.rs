@@ -16,7 +16,19 @@ use winapi::um::winnt::{
 
 use super::Stack;
 
-/// Stack pointer to a 8 Mb pre-allocated stack.
+/// A 8 Mb Stack.
+///
+/// On Unix platforms this will simply reserve 8 Mb of memory to be used as a stack (without a
+/// guard page). Mmap will be called with the MAP_NORESERVE flag to allow us to overcommit on stack
+/// allocations.
+///
+/// On Windows it will reserve 8 Mb of memory + 4 pages on top for the exception handler. Only the
+/// bottom of the stack will be marked as commited, while the rest will be reserved. This allows us
+/// to overcommit on stack allocations. The memory is specifically set up with guard pages in a way
+/// that Windows expect it to be, so that the OS can automatically grow and commit memory.
+///
+/// Even 8 Mb may sound like a lot on all modern operating systems only pages that have something
+/// written to consume physical memory, the rest is cheap virtual memory.
 pub struct EightMbStack(*mut usize);
 
 const EIGHT_MB: usize = 8 * 1024 * 1024;

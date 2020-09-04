@@ -3,7 +3,6 @@ fn main() {
     let task: AsyncWormhole<i32, ()> = AsyncWormhole::new(|mut yielder| {
         let x = yielder.async_suspend(async { 5 });
         assert_eq!(x, 5);
-        panic!("Will a longer panic also fail. What about a really long one.");
         let y = yielder.async_suspend(async { true });
         assert_eq!(y, true);
         42
