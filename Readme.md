@@ -7,7 +7,7 @@
 >
 > **Currently only works in Rust nightly, as it depends on [switcheroo](https://github.com/bkolobara/async-wormhole/tree/master/switcheroo).**
 
-async-wormhole allows you to call .await async calls across non-async functions, like extern "C" or JIT generated code.
+async-wormhole allows you to `.await` async calls in non-async functions, like extern "C" or JIT generated code.
 It runs on Windows, MacOs and Linux (x64 & AArch64).
 
 ## Motivation
