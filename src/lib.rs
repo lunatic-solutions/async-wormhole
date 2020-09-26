@@ -74,7 +74,7 @@ struct ThreadLocal<TLS: 'static> {
 
 pub struct AsyncWormhole<'a, Stack: stack::Stack, Output, TLS: 'static> {
     generator: Cell<Generator<'a, Waker, Option<Output>, Stack>>,
-    thread_local: Option<ThreadLocal<TLS>>
+    thread_local: Option<ThreadLocal<TLS>>,
 }
 
 unsafe impl<Stack: stack::Stack, Output, TLS> Send for AsyncWormhole<'_, Stack, Output, TLS> {}
@@ -90,7 +90,7 @@ impl<'a, Stack: stack::Stack, Output, TLS> AsyncWormhole<'a, Stack, Output, TLS>
             yielder.suspend(Some(f(async_yielder)));
         });
 
-        Ok(Self { generator: Cell::new(generator), thread_local: None })
+        Ok(Self { generator: Cell::new(generator), thread_local: None, destructor: None })
     }
 
     /// Takes a reference to the to be preserved TLS variable.

@@ -23,7 +23,7 @@ fn async_bench(c: &mut Criterion) {
     });
 
     c.bench_function("async_wormhole creation with pool", |b| {
-        let mut pool = OneMbAsyncPool::new(128);
+        let pool = OneMbAsyncPool::new(128);
         b.iter(|| {
             let wormhole = pool.with_tls(&TLS, |mut yielder| {
                 yielder.async_suspend(async { 42 });

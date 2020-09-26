@@ -11,12 +11,14 @@ pub struct OneMbAsyncPool {
     pool: ArrayQueue<OneMbStack>
 }
 
+unsafe impl Sync for OneMbAsyncPool {}
+
 impl OneMbAsyncPool {
     pub fn new(capacity: usize) -> Self {
         Self { pool: ArrayQueue::new(capacity)}
     }
 
-    pub fn with_tls<'a, F, Output, TLS>(&mut self, tls: &'static LocalKey<Cell<*const TLS>>, f: F)
+    pub fn with_tls<'a, F, Output, TLS>(&self, tls: &'static LocalKey<Cell<*const TLS>>, f: F)
         -> Result<AsyncWormhole<'a, OneMbStack, Output, TLS>, Error>
     where
         F: FnOnce(AsyncYielder<Output>) -> Output + 'a,
@@ -36,7 +38,7 @@ impl OneMbAsyncPool {
         }
     }
 
-    pub fn recycle<Output, TLS>(&mut self, async_wormhole: AsyncWormhole<OneMbStack, Output, TLS>) {
+    pub fn recycle<Output, TLS>(&self, async_wormhole: AsyncWormhole<OneMbStack, Output, TLS>) {
         let _ = self.pool.push(async_wormhole.stack());
     }
 }
