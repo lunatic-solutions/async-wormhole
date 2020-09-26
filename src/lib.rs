@@ -22,6 +22,7 @@
 //!
 //! ```rust
 //! use async_wormhole::{AsyncWormhole, AsyncYielder};
+//! use switcheroo::stack::*;
 //!
 //! // non-async function
 //! extern "C" fn non_async(mut yielder: AsyncYielder<u32>) -> u32 {
@@ -31,7 +32,8 @@
 //! }
 //!
 //! fn main() {
-//!     let task: AsyncWormhole<u32, ()> = AsyncWormhole::new(|yielder| {
+//!     let stack = EightMbStack::new().unwrap();
+//!     let task = AsyncWormhole::<_, _, ()>::new(stack, |yielder| {
 //!         let result = non_async(yielder);
 //!         assert_eq!(result, 42);
 //!         64
@@ -43,7 +45,9 @@
 //! }
 //! ```
 
-use switcheroo::stack::*;
+pub mod pool;
+
+use switcheroo::stack;
 use switcheroo::Generator;
 use switcheroo::Yielder;
 
@@ -68,20 +72,19 @@ struct ThreadLocal<TLS: 'static> {
     value: *const TLS,
 }
 
-pub struct AsyncWormhole<'a, Output, TLS: 'static> {
-    generator: Cell<Generator<'a, Waker, Option<Output>, EightMbStack>>,
+pub struct AsyncWormhole<'a, Stack: stack::Stack, Output, TLS: 'static> {
+    generator: Cell<Generator<'a, Waker, Option<Output>, Stack>>,
     thread_local: Option<ThreadLocal<TLS>>
 }
 
-unsafe impl<Output, TLS> Send for AsyncWormhole<'_, Output, TLS> {}
+unsafe impl<Stack: stack::Stack, Output, TLS> Send for AsyncWormhole<'_, Stack, Output, TLS> {}
 
-impl<'a, Output, TLS> AsyncWormhole<'a, Output, TLS> {
-    /// Takes a closure and returns an `impl Future` that can be awaited on.
-    pub fn new<F>(f: F) -> Result<Self, Error>
+impl<'a, Stack: stack::Stack, Output, TLS> AsyncWormhole<'a, Stack, Output, TLS> {
+    /// Takes a stack and a closure and returns an `impl Future` that can be awaited on.
+    pub fn new<F>(stack: Stack, f: F) -> Result<Self, Error>
     where
         F: FnOnce(AsyncYielder<Output>) -> Output + 'a,
     {
-        let stack = EightMbStack::new()?;
         let generator = Generator::new(stack, |yielder, waker| {
             let async_yielder = AsyncYielder::new(yielder, waker);
             yielder.suspend(Some(f(async_yielder)));
@@ -97,9 +100,14 @@ impl<'a, Output, TLS> AsyncWormhole<'a, Output, TLS> {
             value: ptr::null(),
         });
     }
+
+    /// Get the stack from the internal generator.
+    pub fn stack(self) -> Stack {
+        self.generator.into_inner().stack()
+    }
 }
 
-impl<'a, Output, TLS: Unpin> Future for AsyncWormhole<'a, Output, TLS> {
+impl<'a, Stack: stack::Stack + Unpin, Output, TLS: Unpin> Future for AsyncWormhole<'a, Stack, Output, TLS> {
     type Output = Option<Output>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

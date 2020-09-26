@@ -1,7 +1,9 @@
 //! Different stack implementations (currently only contains a 8 Mb stack).
 
 mod eight_mb;
+mod one_mb;
 pub use eight_mb::EightMbStack;
+pub use one_mb::OneMbStack;
 
 /// An implementation of this trait will be accepted by a [generator](struct.Generator.html) as a
 /// valid Stack. Most of the functions provided here are straightforward except for

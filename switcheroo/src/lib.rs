@@ -118,6 +118,11 @@ where
             }
         }
     }
+
+    /// Consume the generator and extract the stack.
+    pub fn stack(self) -> Stack {
+        self.stack
+    }
 }
 
 /// Yielder is an interface provided to every generator through which it returns a value.

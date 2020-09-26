@@ -8,4 +8,5 @@ edition = "2018"
 
 [dependencies]
 async-wormhole = {path = "./.."}
+switcheroo = {path = "./../switcheroo"}
 futures = "0.3"
