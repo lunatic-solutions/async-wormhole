@@ -2,6 +2,7 @@ use async_wormhole::{AsyncWormhole, AsyncYielder};
 use switcheroo::stack::*;
 
 // non-async function
+#[allow(improper_ctypes_definitions)]
 extern "C" fn non_async(mut yielder: AsyncYielder<u32>) -> u32 {
     // Suspend the runtime until async value is ready
     yielder.async_suspend(async { 42 })

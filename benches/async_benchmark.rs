@@ -53,7 +53,7 @@ fn async_bench(c: &mut Criterion) {
     c.bench_function("async switch with TLS", |b| {
         b.iter_batched(
             || {
-                let mut pool = OneMbAsyncPool::new(128);
+                let pool = OneMbAsyncPool::new(128);
                 pool.with_tls(&TLS, |mut yielder| {
                     yielder.async_suspend(async { 42 });
                 }).unwrap()
