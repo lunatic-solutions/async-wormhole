@@ -90,7 +90,7 @@ impl<'a, Stack: stack::Stack, Output, TLS> AsyncWormhole<'a, Stack, Output, TLS>
             yielder.suspend(Some(f(async_yielder)));
         });
 
-        Ok(Self { generator: Cell::new(generator), thread_local: None, destructor: None })
+        Ok(Self { generator: Cell::new(generator), thread_local: None})
     }
 
     /// Takes a reference to the to be preserved TLS variable.
