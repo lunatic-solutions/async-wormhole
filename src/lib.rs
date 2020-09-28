@@ -83,6 +83,11 @@ impl<'a, Stack: stack::Stack, Output, TLS> AsyncWormhole<'a, Stack, Output, TLS>
     /// Takes a stack and a closure and returns an `impl Future` that can be awaited on.
     pub fn new<F>(stack: Stack, f: F) -> Result<Self, Error>
     where
+        // TODO: This needs to be Send, but because Wasmtime's strucutres are not Send for now I don't
+        // enforce it on an API level. Accroding to
+        // https://github.com/bytecodealliance/wasmtime/issues/793#issuecomment-692740254
+        // it is safe to move everything connected to a Store to a different thread all at once, but this
+        // is impossible to express with the type system.
         F: FnOnce(AsyncYielder<Output>) -> Output + 'a,
     {
         let generator = Generator::new(stack, |yielder, waker| {
