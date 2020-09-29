@@ -143,6 +143,7 @@ impl<'a, Stack: stack::Stack + Unpin, Output, TLS: Unpin> Future for AsyncWormho
     }
 }
 
+#[derive(Clone)]
 pub struct AsyncYielder<'a, Output> {
     yielder: &'a Yielder<Waker, Option<Output>>,
     waker: Waker,
