@@ -1,3 +1,5 @@
+#![feature(min_const_generics)]
+
 //! async-wormhole allows you to call `.await` async calls across non-async functions, like extern "C" or JIT
 //! generated code.
 //!
@@ -33,7 +35,7 @@
 //!
 //! fn main() {
 //!     let stack = EightMbStack::new().unwrap();
-//!     let task = AsyncWormhole::<_, _, ()>::new(stack, |yielder| {
+//!     let task = AsyncWormhole::new(stack, |yielder| {
 //!         let result = non_async(yielder);
 //!         assert_eq!(result, 42);
 //!         64
@@ -51,35 +53,72 @@ use switcheroo::stack;
 use switcheroo::Generator;
 use switcheroo::Yielder;
 
-use std::ptr;
+use std::cell::Cell;
+use std::convert::TryInto;
 use std::future::Future;
 use std::io::Error;
 use std::pin::Pin;
-use std::task::{ Context, Poll, Waker };
+use std::task::{Context, Poll, Waker};
 use std::thread::LocalKey;
-use std::cell::Cell;
 
-/// This structure holds one thread local variable that is preserved across context switches.
-/// This gives code that use thread local variables inside the closure the impression that they are
-/// running on the same thread they started even if they have been moved to a different tread.
-/// TODO: This code is currently higly specific to WASMTIME's signal handler TLS and could be
-/// generalized. The only issue is that we can't have `Default` traits on pointers and we need to
-/// get rid of *const TLS in Wasmtime.
+// This structure holds one thread local variable that is preserved across context switches.
+// This gives code that use thread local variables inside the closure the impression that they are
+// running on the same thread they started even if they have been moved to a different one.
 struct ThreadLocal<TLS: 'static> {
-    ptr: &'static LocalKey<Cell<*const TLS>>,
+    reference: &'static LocalKey<Cell<*const TLS>>,
     value: *const TLS,
 }
 
-pub struct AsyncWormhole<'a, Stack: stack::Stack, Output, TLS: 'static> {
-    generator: Cell<Generator<'a, Waker, Option<Output>, Stack>>,
-    thread_local: Option<ThreadLocal<TLS>>,
+impl<TLS> Copy for ThreadLocal<TLS> {}
+impl<TLS> Clone for ThreadLocal<TLS> {
+    fn clone(&self) -> Self {
+        ThreadLocal {
+            reference: self.reference,
+            value: self.value,
+        }
+    }
 }
 
-unsafe impl<Stack: stack::Stack, Output, TLS> Send for AsyncWormhole<'_, Stack, Output, TLS> {}
+/// AsyncWormhole captures a stack and a closure. It also implements Future and can be awaited on.
+pub struct AsyncWormhole<'a, Stack: stack::Stack, Output, TLS: 'static, const TLS_COUNT: usize> {
+    generator: Cell<Generator<'a, Waker, Option<Output>, Stack>>,
+    preserved_thread_locals: [ThreadLocal<TLS>; TLS_COUNT],
+}
 
-impl<'a, Stack: stack::Stack, Output, TLS> AsyncWormhole<'a, Stack, Output, TLS> {
-    /// Takes a stack and a closure and returns an `impl Future` that can be awaited on.
+unsafe impl<Stack: stack::Stack, Output, TLS, const TLS_COUNT: usize> Send
+    for AsyncWormhole<'_, Stack, Output, TLS, TLS_COUNT>
+{
+}
+
+impl<'a, Stack: stack::Stack, Output> AsyncWormhole<'a, Stack, Output, (), 0> {
+    /// Returns a new AsyncWormhole, using the passed `stack` to execute the closure `f` on.
+    /// The closure will not be executed right away, only if you pass AsyncWormhole to an
+    /// async executor (.await on it).
     pub fn new<F>(stack: Stack, f: F) -> Result<Self, Error>
+    where
+        F: FnOnce(AsyncYielder<Output>) -> Output + 'a,
+    {
+        AsyncWormhole::new_with_tls([], stack, f)
+    }
+}
+
+impl<'a, Stack: stack::Stack, Output, TLS, const TLS_COUNT: usize>
+    AsyncWormhole<'a, Stack, Output, TLS, TLS_COUNT>
+{
+    /// Similar to `new`, but allows you to capture thread local variables inside the closure.
+    /// During the execution of the future an async executor can move the closure `f` between
+    /// threads. From the perspective of the code inside the closure `f` the thread local
+    /// variables will be moving with it from thread to thread.
+    ///
+    /// ### Safety
+    ///
+    /// If the thread local variable is only set and used inside of the `f` closure than it's safe
+    ///  to use it. Outside of the closure the content of it will be unpredictable.
+    pub fn new_with_tls<F>(
+        tls_refs: [&'static LocalKey<Cell<*const TLS>>; TLS_COUNT],
+        stack: Stack,
+        f: F,
+    ) -> Result<Self, Error>
     where
         // TODO: This needs to be Send, but because Wasmtime's strucutres are not Send for now I don't
         // enforce it on an API level. Accroding to
@@ -93,15 +132,21 @@ impl<'a, Stack: stack::Stack, Output, TLS> AsyncWormhole<'a, Stack, Output, TLS>
             yielder.suspend(Some(f(async_yielder)));
         });
 
-        Ok(Self { generator: Cell::new(generator), thread_local: None})
-    }
+        let preserved_thread_locals = tls_refs
+            .iter()
+            .map(|tls_ref| ThreadLocal {
+                reference: tls_ref,
+                value: tls_ref.with(|v| v.get()),
+            })
+            .collect::<Vec<ThreadLocal<TLS>>>()
+            .as_slice()
+            .try_into()
+            .unwrap();
 
-    /// Takes a reference to the to be preserved TLS variable.
-    pub fn preserve_tls(&mut self, tls: &'static LocalKey<Cell<*const TLS>>) {
-        self.thread_local = Some(ThreadLocal {
-            ptr: tls,
-            value: ptr::null(),
-        });
+        Ok(Self {
+            generator: Cell::new(generator),
+            preserved_thread_locals,
+        })
     }
 
     /// Get the stack from the internal generator.
@@ -110,32 +155,27 @@ impl<'a, Stack: stack::Stack, Output, TLS> AsyncWormhole<'a, Stack, Output, TLS>
     }
 }
 
-impl<'a, Stack: stack::Stack + Unpin, Output, TLS: Unpin> Future for AsyncWormhole<'a, Stack, Output, TLS> {
+impl<'a, Stack: stack::Stack + Unpin, Output, TLS: Unpin, const TLS_COUNT: usize> Future
+    for AsyncWormhole<'a, Stack, Output, TLS, TLS_COUNT>
+{
     type Output = Option<Output>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // If we saved a TLS value, put it back in.
-        // If this is the first `poll` it will overwrite the existing TLS value with null.
-        match &self.thread_local {
-            None => {},
-            Some(tls) => {
-                tls.ptr.with(|v| v.set(tls.value))
-            }
-        };
+        // Restore thread local values when re-entering execution
+        for tls in self.preserved_thread_locals.iter() {
+            tls.reference.with(|v| v.set(tls.value));
+        }
 
         match self.generator.get_mut().resume(cx.waker().clone()) {
             // If we call the future after it completed it will always return Poll::Pending.
             // But polling a completed future is either way undefined behaviour.
             None | Some(None) => {
-                // Preserve any TLS value if set
-                match self.thread_local.take() {
-                    None => {},
-                    Some(mut tls) => tls.ptr.with(|v|
-                        tls.value = v.get()
-                    )
-                };
+                // Preserve all thread local values
+                for tls in self.preserved_thread_locals.iter_mut() {
+                    tls.reference.with(|v| tls.value = v.get());
+                }
                 Poll::Pending
-            },
+            }
             Some(out) => Poll::Ready(out),
         }
     }

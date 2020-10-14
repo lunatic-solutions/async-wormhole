@@ -26,8 +26,7 @@ pub unsafe fn init<S: stack::Stack>(
             // ".seh_proc trampoline_1",
             // ".seh_pushreg rbp",
             // ".seh_stackalloc 24",
-            "nop",
-            "nop",
+            "nop", "nop",
             // ".seh_endproc",
         )
     }

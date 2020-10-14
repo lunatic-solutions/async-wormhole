@@ -43,7 +43,7 @@
 // Windows needs to preserve some extra information across context switches, like the stack base, top
 // and deallocation values. If they are not present Windows will not know how to grow the stack.
 // The [Boost.Context](https://www.boost.org/doc/libs/1_61_0/libs/context/doc/html/context/overview.html)
-// library also preserves some other information, like the current 
+// library also preserves some other information, like the current
 // [Fiber](https://docs.microsoft.com/en-us/windows/win32/procthread/fibers) data, but I don't expect
 // anyone to use switcheroo and Windows Fibers in the same app.
 //

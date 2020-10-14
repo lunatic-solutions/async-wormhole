@@ -28,7 +28,6 @@
 //! }
 // ```
 
-
 mod arch;
 pub mod stack;
 
