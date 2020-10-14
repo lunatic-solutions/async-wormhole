@@ -55,9 +55,7 @@ use std::ptr;
 use std::future::Future;
 use std::io::Error;
 use std::pin::Pin;
-use std::task::Context;
-use std::task::Poll;
-use std::task::Waker;
+use std::task::{ Context, Poll, Waker };
 use std::thread::LocalKey;
 use std::cell::Cell;
 

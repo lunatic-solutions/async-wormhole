@@ -2,7 +2,7 @@ use std::io::Error;
 use std::thread::LocalKey;
 use std::cell::Cell;
 
-use crossbeam::queue::{ArrayQueue, PopError};
+use crossbeam::queue::{ArrayQueue};
 use switcheroo::stack::*;
 
 use super::{ AsyncWormhole, AsyncYielder };
@@ -24,13 +24,13 @@ impl OneMbAsyncPool {
         F: FnOnce(AsyncYielder<Output>) -> Output + 'a,
     {
         match self.pool.pop() {
-            Err(PopError) => {
+            None => {
                 let stack = OneMbStack::new()?;
                 let mut wormhole = AsyncWormhole::new(stack, f)?;
                 wormhole.preserve_tls(tls);
                 Ok(wormhole)
             },
-            Ok(stack) => {
+            Some(stack) => {
                 let mut wormhole = AsyncWormhole::new(stack, f)?;
                 wormhole.preserve_tls(tls);
                 Ok(wormhole)
@@ -39,6 +39,7 @@ impl OneMbAsyncPool {
     }
 
     pub fn recycle<Output, TLS>(&self, async_wormhole: AsyncWormhole<OneMbStack, Output, TLS>) {
+        // If we push over the capacity just drop the stack.
         let _ = self.pool.push(async_wormhole.stack());
     }
 }
