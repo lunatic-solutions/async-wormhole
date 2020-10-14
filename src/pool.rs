@@ -2,7 +2,7 @@ use std::io::Error;
 use std::thread::LocalKey;
 use std::cell::Cell;
 
-use crossbeam::queue::{ArrayQueue};
+use crossbeam::queue::ArrayQueue;
 use switcheroo::stack::*;
 
 use super::{ AsyncWormhole, AsyncYielder };
