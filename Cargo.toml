@@ -1,6 +1,6 @@
 [package]
 name = "async-wormhole"
-version = "0.2"
+version = "0.2.0"
 authors = ["Bernard Kolobara <me@kolobara.com>"]
 edition = "2018"
 license = "Apache-2.0/MIT"
@@ -13,7 +13,7 @@ repository = "https://github.com/bkolobara/async-wormhole/"
 [dependencies]
 pin-utils = "0.1"
 crossbeam = "0.8"
-switcheroo = { path = "./switcheroo", version = "0.1.2" }
+switcheroo = { path = "./switcheroo", version = "0.2" }
 
 [dev-dependencies]
 futures = "0.3"
