@@ -13,7 +13,7 @@ repository = "https://github.com/bkolobara/async-wormhole/"
 [dependencies]
 pin-utils = "0.1"
 crossbeam = "0.8"
-switcheroo = { path = "./switcheroo", version = "0.1.1" }
+switcheroo = { path = "./switcheroo", version = "0.1.2" }
 
 [dev-dependencies]
 futures = "0.3"
