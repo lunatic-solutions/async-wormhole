@@ -17,7 +17,7 @@
 //!
 //! Sometimes you also need to preserve thread local storage as the code inside the closure expects it to stay
 //! the same, but the actual execution can be moved between threads. There is a
-//! [proof of concept API](struct.AsyncWormhole.html#method.preserve_tls)
+//! [proof of concept API](struct.AsyncWormhole.html#method.new_with_tls)
 //! to allow you to move your thread local storage with the closure across threads.
 //!
 //! ## Example
