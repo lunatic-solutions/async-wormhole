@@ -13,7 +13,7 @@ pub unsafe fn init<S: stack::Stack>(
     let mut sp = stack.bottom();
     // Align stack
     sp = push(sp, 0);
-    // Save the function on the stack that is going to be called by ``
+    // Save the (generator_wrapper) function on the stack.
     sp = push(sp, f as usize);
 
     #[naked]
@@ -29,7 +29,11 @@ pub unsafe fn init<S: stack::Stack>(
     #[naked]
     unsafe extern "C" fn trampoline_2() {
         asm!(
+            // call frame address = take address from register RBP and add offset 16 to it.
+            // RBP at this point contains the address of the *Caller frame* stack location.
+            // The *Caller frame* location contains the value of the previous RSP.
             ".cfi_def_cfa rbp, 16",
+            // previous value of RBP is saved at CFA + 16
             ".cfi_offset rbp, -16",
             "nop",
             "call [rsp + 16]"

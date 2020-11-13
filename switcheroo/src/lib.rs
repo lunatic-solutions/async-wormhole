@@ -31,18 +31,31 @@
 mod arch;
 pub mod stack;
 
+use std::any::Any;
 use std::cell::Cell;
 use std::marker::PhantomData;
-use std::{mem, ptr};
+use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
+use std::{mem, ptr::NonNull};
+
+// Communicates the return of the Generator.
+enum GeneratorOutput<Output> {
+    // The generator returned a regular value.
+    Value(Output),
+    // The generator finished and there are no more values to be returned.
+    Finished,
+    // The generator panicked. This value is passed to `resume_unwind` to continue the unwind
+    // across contexts.
+    Panic(Box<dyn Any + Send + 'static>), // Err part of std::thread::Result
+}
 
 /// Generator wraps a closure and allows suspending its execution more than once, returning
 /// a value each time.
 ///
 /// If the closure finishes each other call to [resume](struct.Generator.html#method.resume)
-/// will yield `None`.
+/// will yield `None`. If the closure panics the unwind will happen correctly across contexts.
 pub struct Generator<'a, Input: 'a, Output: 'a, Stack: stack::Stack> {
     stack: Stack,
-    stack_ptr: Option<ptr::NonNull<usize>>,
+    stack_ptr: Option<NonNull<usize>>,
     phantom: PhantomData<(&'a (), *mut Input, *const Output)>,
 }
 
@@ -57,6 +70,11 @@ where
     where
         F: FnOnce(&Yielder<Input, Output>, Input) + 'a,
     {
+        // This function will be written to the new stack (by `arch::init`) as the initial
+        // entry point. During the `arch::swap_and_link_stacks` call it will be called with
+        // the correct closure passed as the first argument. This function will never return.
+        // Yielding back into it after `yielder.suspend_(GeneratorOutput::Finished)` was
+        // called would be undefined behavior.
         unsafe extern "C" fn generator_wrapper<Input, Output, Stack, F>(
             f_ptr: usize,
             stack_ptr: *mut usize,
@@ -69,13 +87,27 @@ where
             let input = std::ptr::read(data as *const Input);
             let yielder = Yielder::new(stack_ptr);
 
-            f(&yielder, input);
-            // On last invocation of `suspend` return None
-            yielder.suspend_(None);
+            // It is not safe to unwind across the context switch directly.
+            // The unwind will continue in the original context.
+            match catch_unwind(AssertUnwindSafe(|| {
+                f(&yielder, input);
+            })) {
+                Ok(_) => yielder.suspend_(GeneratorOutput::Finished),
+                Err(panic) => yielder.suspend_(GeneratorOutput::Panic(panic)),
+            };
         }
 
+        // Prepare the stack
         let stack_ptr = unsafe { arch::init(&stack, generator_wrapper::<Input, Output, Stack, F>) };
+
+        // f needs to live on after this function, it is part of the new context. This prevents it
+        // from being dropped.
         let f = mem::ManuallyDrop::new(f);
+
+        // This call will link the stacks together with assembly directives magic, but once the
+        // first `arch::swap` inside `generator_wrapper` is reached it will yield back before the
+        // execution of the closure `f`.
+        // Only the next call to `resume` will start executing the closure.
         let stack_ptr = unsafe {
             arch::swap_and_link_stacks(
                 &f as *const mem::ManuallyDrop<F> as usize,
@@ -87,7 +119,7 @@ where
 
         Generator {
             stack,
-            stack_ptr: Some(ptr::NonNull::new(stack_ptr).unwrap()),
+            stack_ptr: Some(NonNull::new(stack_ptr).unwrap()),
             phantom: PhantomData,
         }
     }
@@ -99,21 +131,27 @@ where
             return None;
         };
         let stack_ptr = self.stack_ptr.unwrap();
-        self.stack_ptr = None;
+
         unsafe {
             let input = mem::ManuallyDrop::new(input);
-            let (data_out, stack_ptr) = arch::swap_and_link_stacks(
+            let (data_out, stack_ptr) = arch::swap(
                 &input as *const mem::ManuallyDrop<Input> as usize,
                 stack_ptr.as_ptr(),
-                self.stack.bottom(),
             );
 
-            // Should always be a pointer and never 0
-            if data_out == 0 {
-                return None;
-            } else {
-                self.stack_ptr = Some(ptr::NonNull::new_unchecked(stack_ptr));
-                Some(std::ptr::read(data_out as *const Output))
+            let output = std::ptr::read(data_out as *const GeneratorOutput<Output>);
+            match output {
+                GeneratorOutput::Value(value) => {
+                    self.stack_ptr = Some(NonNull::new(stack_ptr).unwrap());
+                    Some(value)
+                }
+                GeneratorOutput::Finished => {
+                    self.stack_ptr = None;
+                    None
+                }
+                GeneratorOutput::Panic(panic) => {
+                    resume_unwind(panic);
+                }
             }
         }
     }
@@ -142,27 +180,17 @@ impl<Input, Output> Yielder<Input, Output> {
     /// the generator.
     #[inline(always)]
     pub fn suspend(&self, val: Output) -> Input {
-        unsafe { self.suspend_(Some(val)) }
+        unsafe { self.suspend_(GeneratorOutput::Value(val)) }
     }
 
     #[inline(always)]
-    unsafe fn suspend_(&self, val: Option<Output>) -> Input {
-        match val {
-            None => {
-                // Let the resume know we are done here
-                arch::swap(0, self.stack_ptr.get());
-                unreachable!();
-            }
-            Some(val) => {
-                let val = mem::ManuallyDrop::new(val);
-                let (data, stack_ptr) = arch::swap(
-                    &val as *const mem::ManuallyDrop<Output> as usize,
-                    self.stack_ptr.get(),
-                );
-                self.stack_ptr.set(stack_ptr);
-
-                std::ptr::read(data as *const Input)
-            }
-        }
+    unsafe fn suspend_(&self, out: GeneratorOutput<Output>) -> Input {
+        let out = mem::ManuallyDrop::new(out);
+        let (data, stack_ptr) = arch::swap(
+            &out as *const mem::ManuallyDrop<GeneratorOutput<Output>> as usize,
+            self.stack_ptr.get(),
+        );
+        self.stack_ptr.set(stack_ptr);
+        std::ptr::read(data as *const Input)
     }
 }

@@ -11,54 +11,60 @@ pub unsafe fn init<S: stack::Stack>(
     }
 
     let mut sp = stack.bottom();
-    // Add 2 slots of shadow stack on Windows + align stack. With the other arguments pushed later
-    // this will result in actually 4 slots of shadow stack (home addresses), as required by Windwos.
-    for _ in 0..3 {
-        sp = push(sp, 0);
-    }
-    // Save the function on the stack that is going to be called by ``
+
+    // Save the (generator_wrapper) function on the stack.
     sp = push(sp, f as usize);
-
-    #[naked]
-    #[no_mangle]
-    unsafe extern "C" fn trampoline_1() {
-        asm!(
-            // ".seh_proc trampoline_1",
-            // ".seh_pushreg rbp",
-            // ".seh_stackalloc 24",
-            "nop", "nop",
-            // ".seh_endproc",
-        )
-    }
-
-    // Call frame for trampoline_2. The CFA slot is updated by swap_and_link function
-    // each time a context switch is performed.
-    sp = push(sp, trampoline_1 as usize + 2); // Point to return instruction after 2 x nop
     sp = push(sp, 0xdeaddeaddead0cfa);
 
     #[naked]
     #[no_mangle]
-    unsafe extern "C" fn trampoline_2() {
+    unsafe extern "C" fn trampoline() {
         asm!(
-            // ".seh_proc trampoline_2",
-            // ".seh_setframe rbp, 0",
-            // ".seh_pushreg rbp",
+            // This directives will create unwind codes to link the two stacks together during stack traces.
+            // The assembly was carefully crafted by a painfully long process of trial and error. For the most
+            // part I was guessing how the stack tracing uses the Windows unwind codes and then went ahead and
+            // constructed appropriate seh_* directives to generate this unwind codes. The desired outcome can
+            // be described in different ways with seh_* directives, but after many tests this was established
+            // to be the most reliable one under debug and release builds. The produced unwind codes are:
+            //
+            // 0x03: UOP_PushNonVol RSP - Restore the RSP by pointing it to the previous stack and increment it
+            //             by 8, jumping over the stack place holding the the deallocation stack.
+            // 0x02: UOP_AllocSmall 16  - Increment the RSP by 16 jumping over 2 stack slots: stack limit & base.
+            // 0x01: UOP_PushNonVol RBP - Pop the previous RBP from the stack.
+            //
+            // Once the unwinder reaches this function the value on the stack is going to be the value of the previous
+            // RSP. After it processes the unwind codes it will look like `trampoline` was called from the `swap` function,
+            // because the next value on the stack is the IP value pointing back inside `swap`.
+            //
+            // Opposite of Unix systems, here we only need one trampoline function to achieve the same outcome.
+            //
+            //TODO: Create ASCII art showing how exactly the stack looks.
+            ".seh_proc trampoline",
             "nop",
-            "call [rsp + 16]",
-            // ".seh_endproc",
+            ".seh_pushreg rbp",
+            "nop",
+            ".seh_stackalloc 16",
+            "nop",
+            ".seh_pushreg rsp",
+            ".seh_endprologue",
+            "call [rsp + 8]",
+            "nop",
+            "nop",
+            ".seh_endproc",
         )
     }
 
     // Save frame pointer
     let frame = sp;
-    sp = push(sp, trampoline_2 as usize + 1); // call instruction
+    sp = push(sp, trampoline as usize + 3); //  "call [rsp + 16]" instruction
     sp = push(sp, frame as usize);
 
     // The next few values are not really documented in Windows and we rely on this Wiki page:
     // https://en.wikipedia.org/wiki/Win32_Thread_Information_Block
     // and this file from Boost's Context library:
     // https://github.com/boostorg/context/blob/develop/src/asm/jump_x86_64_ms_pe_masm.asm
-    // to preserve all needed information for Windows to be able to automatically move the stack guard page.
+    // to preserve all needed information for Windows to be able to automatically extend the stack and
+    // move the stack guard page.
 
     // Stack base
     sp = push(sp, stack.bottom() as usize);
@@ -103,7 +109,7 @@ pub unsafe fn swap_and_link_stacks(
         "push rax",
 
         // Link stacks
-        "mov [rdi - 48], rsp",
+        "mov [rdi - 16], rsp",
 
         // Set the current pointer as the 2nd element (rdx) of the function we are jumping to.
         "mov rdx, rsp",

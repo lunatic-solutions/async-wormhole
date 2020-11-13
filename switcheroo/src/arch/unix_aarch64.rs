@@ -13,7 +13,7 @@ pub unsafe fn init<S: stack::Stack>(
     let mut sp = stack.bottom();
     // Align stack
     sp = push(sp, 0);
-    // Save the function on the stack that is going to be called by `swap_*`
+    // Save the (generator_wrapper) function on the stack.
     sp = push(sp, f as usize);
 
     #[naked]

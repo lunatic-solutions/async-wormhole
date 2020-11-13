@@ -18,6 +18,7 @@ fn switch_stack() {
     assert_eq!(add_one.resume(-1), Some(0));
     assert_eq!(add_one.resume(0), None);
     assert_eq!(add_one.resume(0), None);
+    assert_eq!(add_one.resume(0), None);
 }
 
 #[test]

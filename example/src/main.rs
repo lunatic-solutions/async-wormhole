@@ -11,8 +11,10 @@ extern "C" fn non_async(mut yielder: AsyncYielder<u32>) -> u32 {
 fn main() {
     let stack = EightMbStack::new().unwrap();
     let task = AsyncWormhole::new(stack, |yielder| {
+        panic!("Error");
         let result = non_async(yielder);
         assert_eq!(result, 42);
+
         64
     })
     .unwrap();

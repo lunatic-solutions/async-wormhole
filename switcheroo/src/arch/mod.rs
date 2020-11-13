@@ -53,12 +53,13 @@
 //
 // ### swap_and_link_stacks
 // This function is really similar to `swap`, but it's expected to be the first one called when jumping
-// to another stack. It will write the **Call frame** data inside the new stack, basically linking them
+// to a new stack. It will write the **Caller frame** data inside the new stack, basically linking them
 // together. Once this data exists on the new stack we don't need to call it anymore and can switch
 // stacks with just the `swap` function.
 //
 // The swap functions will:
 // 1. Preserve the frame pointer and instruction pointer of the current context.
+//    On Windows, deallocation stack, stack limit and base stack are also preserved.
 // 2. Change the stack pointer to the new stack.
 // 3. Pop the frame pointer and instruction pointer from the new stack.
 // 4. Jump to the instruction.

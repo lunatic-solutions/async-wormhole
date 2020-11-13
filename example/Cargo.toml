@@ -10,3 +10,4 @@ edition = "2018"
 async-wormhole = {path = "./.."}
 switcheroo = {path = "./../switcheroo"}
 futures = "0.3"
+backtrace = "0.3"

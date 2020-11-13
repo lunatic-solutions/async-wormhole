@@ -15,6 +15,6 @@ fn create_300k_8_mb_stacks() {
     for _i in 0..300_000 {
         let stack = EightMbStack::new();
         assert!(stack.is_ok());
-        stacks.push(stack.unwrap());
+        stacks.push(stack);
     }
 }
