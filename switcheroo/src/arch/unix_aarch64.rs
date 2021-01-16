@@ -64,7 +64,7 @@ pub unsafe fn swap_and_link_stacks(
         "adr lr, 1337f",
         "stp x29, x30, [sp, #-16]!",
         "mov x1, sp",
-        "str x1, [x3 - #32]",
+        "str x1, [x3, #-32]",
         "mov sp, x2",
         "ldp x29, x30, [sp], #16",
         "br x30",
