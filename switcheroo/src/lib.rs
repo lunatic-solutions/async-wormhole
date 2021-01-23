@@ -54,7 +54,8 @@ enum GeneratorOutput<Output> {
 /// If the closure finishes each other call to [resume](struct.Generator.html#method.resume)
 /// will yield `None`. If the closure panics the unwind will happen correctly across contexts.
 pub struct Generator<'a, Input: 'a, Output: 'a, Stack: stack::Stack> {
-    stack: Stack,
+    started: bool,
+    stack: Option<Stack>,
     stack_ptr: Option<NonNull<usize>>,
     phantom: PhantomData<(&'a (), *mut Input, *const Output)>,
 }
@@ -87,7 +88,7 @@ where
             let input = std::ptr::read(data as *const Input);
             let yielder = Yielder::new(stack_ptr);
 
-            // It is not safe to unwind across the context switch directly.
+            // It is not safe to unwind across the context switch.
             // The unwind will continue in the original context.
             match catch_unwind(AssertUnwindSafe(|| {
                 f(&yielder, input);
@@ -101,7 +102,7 @@ where
         let stack_ptr = unsafe { arch::init(&stack, generator_wrapper::<Input, Output, Stack, F>) };
 
         // f needs to live on after this function, it is part of the new context. This prevents it
-        // from being dropped.
+        // from being dropped. The drop happens inside of the `generator_wrapper()` function.
         let f = mem::ManuallyDrop::new(f);
 
         // This call will link the stacks together with assembly directives magic, but once the
@@ -118,7 +119,8 @@ where
         };
 
         Generator {
-            stack,
+            started: false,
+            stack: Some(stack),
             stack_ptr: Some(NonNull::new(stack_ptr).unwrap()),
             phantom: PhantomData,
         }
@@ -134,6 +136,8 @@ where
 
         unsafe {
             let input = mem::ManuallyDrop::new(input);
+            // Mark the `Generator` as started
+            self.started = true;
             let (data_out, stack_ptr) = arch::swap(
                 &input as *const mem::ManuallyDrop<Input> as usize,
                 stack_ptr.as_ptr(),
@@ -150,15 +154,47 @@ where
                     None
                 }
                 GeneratorOutput::Panic(panic) => {
+                    self.stack_ptr = None;
                     resume_unwind(panic);
                 }
             }
         }
     }
 
+    /// Returns true if the execution of the passed in closure started
+    #[inline(always)]
+    pub fn started(&self) -> bool {
+        self.started
+    }
+
+    /// Returns true if the generator finished running.
+    #[inline(always)]
+    pub fn finished(&self) -> bool {
+        self.stack_ptr.is_none()
+    }
+
     /// Consume the generator and extract the stack.
-    pub fn stack(self) -> Stack {
-        self.stack
+    pub fn stack(mut self) -> Option<Stack> {
+        self.stack.take()
+        // Drop for Generator is executed here while the stack is still alive.
+    }
+}
+
+impl<'a, Input, Output, Stack> Drop for Generator<'a, Input, Output, Stack>
+where
+    Input: 'a,
+    Output: 'a,
+    Stack: stack::Stack,
+{
+    fn drop(&mut self) {
+        // If there is still data on the stack unwind it.
+        if self.started() && !self.finished() {
+            unsafe {
+                let (data, _stack_ptr) = arch::swap(0, self.stack_ptr.unwrap().as_ptr());
+                // We catch the unwind in the other context, but don't resume it here (just drop the panic value).
+                let _panic = std::ptr::read(data as *const GeneratorOutput<Output>);
+            };
+        }
     }
 }
 
@@ -190,7 +226,16 @@ impl<Input, Output> Yielder<Input, Output> {
             &out as *const mem::ManuallyDrop<GeneratorOutput<Output>> as usize,
             self.stack_ptr.get(),
         );
+
+        // Set return point. This needs to happen before unwind is triggered.
         self.stack_ptr.set(stack_ptr);
+
+        // We use the data pointer to signalize an unwind trigger.
+        // It should never be 0 otherwise.
+        if data == 0 {
+            resume_unwind(Box::new(()));
+        }
+
         std::ptr::read(data as *const Input)
     }
 }

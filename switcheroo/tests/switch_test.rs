@@ -51,3 +51,15 @@ fn panic_on_different_stack() {
     });
     let _: u32 = add_one.resume(0).unwrap();
 }
+
+#[test]
+fn drop_stack_with_unwind() {
+    let stack = EightMbStack::new().unwrap();
+    let mut add_one = Generator::new(stack, |yielder, mut _input| {
+        let _local_variable = Box::new(0);
+        yielder.suspend(());
+        yielder.suspend(());
+        yielder.suspend(());
+    });
+    let _: () = add_one.resume(()).unwrap();
+}

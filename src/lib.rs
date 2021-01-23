@@ -1,5 +1,3 @@
-#![feature(min_const_generics)]
-
 //! async-wormhole allows you to call `.await` async calls across non-async functions, like extern "C" or JIT
 //! generated code.
 //!
@@ -27,6 +25,7 @@
 //! use switcheroo::stack::*;
 //!
 //! // non-async function
+//! #[allow(improper_ctypes_definitions)]
 //! extern "C" fn non_async(mut yielder: AsyncYielder<u32>) -> u32 {
 //! 	// Suspend the runtime until async value is ready.
 //! 	// Can contain .await calls.
@@ -120,8 +119,8 @@ impl<'a, Stack: stack::Stack, Output, TLS, const TLS_COUNT: usize>
         f: F,
     ) -> Result<Self, Error>
     where
-        // TODO: This needs to be Send, but because Wasmtime's strucutres are not Send for now I don't
-        // enforce it on an API level. Accroding to
+        // TODO: This needs to be Send, but because Wasmtime's structures are not Send for now I don't
+        // enforce it on an API level. According to
         // https://github.com/bytecodealliance/wasmtime/issues/793#issuecomment-692740254
         // it is safe to move everything connected to a Store to a different thread all at once, but this
         // is impossible to express with the type system.
@@ -129,7 +128,8 @@ impl<'a, Stack: stack::Stack, Output, TLS, const TLS_COUNT: usize>
     {
         let generator = Generator::new(stack, |yielder, waker| {
             let async_yielder = AsyncYielder::new(yielder, waker);
-            yielder.suspend(Some(f(async_yielder)));
+            let finished = Some(f(async_yielder));
+            yielder.suspend(finished);
         });
 
         let preserved_thread_locals = tls_refs
@@ -150,8 +150,9 @@ impl<'a, Stack: stack::Stack, Output, TLS, const TLS_COUNT: usize>
     }
 
     /// Get the stack from the internal generator.
+    /// TODO: Change to return Option instead of unwrap
     pub fn stack(self) -> Stack {
-        self.generator.into_inner().stack()
+        self.generator.into_inner().stack().unwrap()
     }
 }
 
@@ -176,7 +177,11 @@ impl<'a, Stack: stack::Stack + Unpin, Output, TLS: Unpin, const TLS_COUNT: usize
                 }
                 Poll::Pending
             }
-            Some(out) => Poll::Ready(out),
+            Some(out) => {
+                // Poll one last time to finish the generator
+                self.generator.get_mut().resume(cx.waker().clone());
+                Poll::Ready(out)
+            }
         }
     }
 }
@@ -199,8 +204,8 @@ impl<'a, Output> AsyncYielder<'a, Output> {
     {
         pin_utils::pin_mut!(future);
         loop {
-            let cx = &mut Context::from_waker(&mut self.waker);
-            self.waker = match future.as_mut().poll(cx) {
+            let mut cx = Context::from_waker(&mut self.waker);
+            self.waker = match future.as_mut().poll(&mut cx) {
                 Poll::Pending => self.yielder.suspend(None),
                 Poll::Ready(result) => return result,
             };

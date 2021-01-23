@@ -1,6 +1,6 @@
 [package]
 name = "async-wormhole"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Bernard Kolobara <me@kolobara.com>"]
 edition = "2018"
 license = "Apache-2.0/MIT"
@@ -16,6 +16,7 @@ crossbeam = "0.8"
 switcheroo = { path = "./switcheroo", version = "0.2" }
 
 [dev-dependencies]
+async-executor = "1.4"
 futures = "0.3"
 criterion = "0.3"
 libc = "0.2"
@@ -28,5 +29,4 @@ harness = false
 members = [
   ".",
   "switcheroo",
-  "example"
 ]

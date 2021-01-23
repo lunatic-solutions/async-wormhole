@@ -23,6 +23,7 @@ pub unsafe fn init<S: stack::Stack>(
             ".cfi_offset x30, -8",
             ".cfi_offset x29, -16",
             "nop",
+            options(noreturn)
         )
     }
 
@@ -40,6 +41,7 @@ pub unsafe fn init<S: stack::Stack>(
             "nop",
             "ldr x2, [sp, #16]",
             "blr x2"
+            options(noreturn)
         )
     }
 

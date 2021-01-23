@@ -18,7 +18,13 @@ pub unsafe fn init<S: stack::Stack>(
 
     #[naked]
     unsafe extern "C" fn trampoline_1() {
-        asm!(".cfi_def_cfa rbp, 16", ".cfi_offset rbp, -16", "nop", "nop",)
+        asm!(
+            ".cfi_def_cfa rbp, 16",
+            ".cfi_offset rbp, -16",
+            "nop",
+            "nop",
+            options(noreturn)
+        )
     }
 
     // Call frame for trampoline_2. The CFA slot is updated by swap::trampoline
@@ -36,7 +42,8 @@ pub unsafe fn init<S: stack::Stack>(
             // previous value of RBP is saved at CFA + 16
             ".cfi_offset rbp, -16",
             "nop",
-            "call [rsp + 16]"
+            "call [rsp + 16]",
+            options(noreturn)
         )
     }
 

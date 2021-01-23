@@ -1,0 +1,32 @@
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+name: Test
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+          - os: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install latest nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: rustfmt, clippy
+      - name: Run tests in Debug Build
+        run: cargo +nightly test --all
+      - name: Run tests in Release Build
+        run: cargo +nightly test --all --release
+      - name: Run benchmarks
+        run: cargo +nightly bench --all

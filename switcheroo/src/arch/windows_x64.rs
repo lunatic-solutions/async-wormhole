@@ -51,6 +51,7 @@ pub unsafe fn init<S: stack::Stack>(
             "nop",
             "nop",
             ".seh_endproc",
+            options(noreturn)
         )
     }
 
