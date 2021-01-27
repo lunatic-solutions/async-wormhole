@@ -50,6 +50,7 @@ pub unsafe fn init<S: stack::Stack>(
             "call [rsp + 8]",
             "nop",
             "nop",
+            "ret",
             ".seh_endproc",
             options(noreturn)
         )

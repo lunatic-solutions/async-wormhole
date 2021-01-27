@@ -23,6 +23,7 @@ pub unsafe fn init<S: stack::Stack>(
             ".cfi_offset rbp, -16",
             "nop",
             "nop",
+            "ret",
             options(noreturn)
         )
     }
@@ -43,6 +44,7 @@ pub unsafe fn init<S: stack::Stack>(
             ".cfi_offset rbp, -16",
             "nop",
             "call [rsp + 16]",
+            "ret",
             options(noreturn)
         )
     }
