@@ -198,14 +198,14 @@ impl<'a, Output> AsyncYielder<'a, Output> {
     }
 
     /// Takes an `impl Future` and awaits it, returning the value from it once ready.
-    pub fn async_suspend<Fut, R>(&mut self, future: Fut) -> R
+    pub fn async_suspend<Fut, R>(&mut self, mut future: Fut) -> R
     where
         Fut: Future<Output = R>,
     {
-        pin_utils::pin_mut!(future);
         loop {
+            let future = unsafe { Pin::new_unchecked(&mut future) };
             let mut cx = Context::from_waker(&mut self.waker);
-            self.waker = match future.as_mut().poll(&mut cx) {
+            self.waker = match future.poll(&mut cx) {
                 Poll::Pending => self.yielder.suspend(None),
                 Poll::Ready(result) => return result,
             };
