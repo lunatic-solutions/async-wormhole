@@ -10,7 +10,7 @@ extern "C" fn non_async(mut yielder: AsyncYielder<u32>) -> u32 {
 
 fn main() {
     let stack = EightMbStack::new().unwrap();
-    let task = AsyncWormhole::<_, _, fn(), fn()>::new(stack, |yielder| {
+    let task = AsyncWormhole::<_, _, fn()>::new(stack, |yielder| {
         let result = non_async(yielder);
         assert_eq!(result, 42);
         64

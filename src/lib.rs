@@ -29,7 +29,7 @@
 //!
 //! fn main() {
 //!     let stack = EightMbStack::new().unwrap();
-//!     let task = AsyncWormhole::<_, _, fn(), fn()>::new(stack, |yielder| {
+//!     let task = AsyncWormhole::<_, _, fn()>::new(stack, |yielder| {
 //!         let result = non_async(yielder);
 //!         assert_eq!(result, 42);
 //!         64
@@ -58,37 +58,33 @@ pub use switcheroo::stack;
 /// [AsyncYielder](struct.AsyncYielder). Once all Futures have been awaited on AsyncWormhole will resolve
 /// to the return value of the provided closure.
 ///
-/// For fine-grained poll control, two additional functions can be provided:
-/// * [AsyncWormhole::set_pre_poll](struct.AsyncWormhole.html#method.set_pre_poll)
-/// * [AsyncWormhole::set_post_poll_pending](struct.AsyncWormhole.html#method.set_post_poll_pending)
-/// One common use cases for them is to preserve some thread local state across the execution of the closure.
-/// Every time an executor polls AsyncWormhole, the `pre_poll` function will be called and every time
-/// AsyncWormhole returns `Poll::Pending`, `post_poll_pending` will be called. Between this two calls we
-/// have a guarantee that the executor will not be able to move the execution another thread.
-pub struct AsyncWormhole<'a, Stack, Output, P1, P2>
+/// For dealing with thread local storage
+/// [AsyncWormhole::set_pre_post_poll](struct.AsyncWormhole.html#method.set_pre_post_poll) is provided.
+///
+/// Every time an executor polls AsyncWormhole, the `pre_post_poll` function will be called and every time
+/// AsyncWormhole returns `Poll::Pending`, `pre_post_poll` will be called again. Between this two calls we
+/// have a guarantee that the executor will not be able to move the execution to another thread, and we
+/// can use this guarantee to our advantage in specific scenarios.
+pub struct AsyncWormhole<'a, Stack, Output, P>
 where
     Stack: stack::Stack,
-    P1: Fn(),
-    P2: Fn(),
+    P: Fn(),
 {
     generator: Cell<Generator<'a, Waker, Option<Output>, Stack>>,
-    pre_poll: Option<P1>,
-    post_poll_pending: Option<P2>,
+    pre_post_poll: Option<P>,
 }
 
-unsafe impl<Stack, Output, P1, P2> Send for AsyncWormhole<'_, Stack, Output, P1, P2>
+unsafe impl<Stack, Output, P> Send for AsyncWormhole<'_, Stack, Output, P>
 where
     Stack: stack::Stack,
-    P1: Fn(),
-    P2: Fn(),
+    P: Fn(),
 {
 }
 
-impl<'a, Stack, Output, P1, P2> AsyncWormhole<'a, Stack, Output, P1, P2>
+impl<'a, Stack, Output, P> AsyncWormhole<'a, Stack, Output, P>
 where
     Stack: stack::Stack,
-    P1: Fn(),
-    P2: Fn(),
+    P: Fn(),
 {
     /// Returns a new AsyncWormhole, using the passed `stack` to execute the closure `f` on.
     /// The closure will not be executed right away, only if you pass AsyncWormhole to an
@@ -110,24 +106,14 @@ where
 
         Ok(Self {
             generator: Cell::new(generator),
-            pre_poll: None,
-            post_poll_pending: None,
+            pre_post_poll: None,
         })
     }
 
-    /// Sets a function that will be called when an executor polls AsyncWormhole.
-    pub fn set_pre_poll(&mut self, f: P1) {
-        self.pre_poll = Some(f);
-    }
-
-    /// Sets a function that will be called if AsyncWormhole needs to wait on another future to
-    /// complete and returns `Poll::Pending` to the executor.
-    ///
-    /// Next time poll is called, it may happen on another thread, so here is a good point to
-    /// preserve all thread local variables we may need to restore again in
-    /// [AsyncWormhole::set_pre_poll](struct.AsyncWormhole.html#method.set_pre_poll)
-    pub fn set_post_poll_pending(&mut self, f: P2) {
-        self.post_poll_pending = Some(f);
+    /// Every time the executor polls `AsyncWormhole` we may end up on another thread, here we can set a function
+    /// that swaps some thread local storage and a context that can travel with `AsyncWormhole` between threads.
+    pub fn set_pre_post_poll(&mut self, f: P) {
+        self.pre_post_poll = Some(f);
     }
 
     /// Get the stack from the internal generator.
@@ -136,27 +122,26 @@ where
     }
 }
 
-impl<'a, Stack, Output, P1, P2> Future for AsyncWormhole<'a, Stack, Output, P1, P2>
+impl<'a, Stack, Output, P> Future for AsyncWormhole<'a, Stack, Output, P>
 where
     Stack: stack::Stack + Unpin,
-    P1: Fn() + Unpin,
-    P2: Fn() + Unpin,
+    P: Fn() + Unpin,
 {
     type Output = Option<Output>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // If pre_poll is provided execute it before entering separate stack
-        if let Some(pre_poll) = &self.pre_poll {
-            pre_poll()
+        // If pre_post_poll is provided execute it before entering separate stack
+        if let Some(pre_post_poll) = &self.pre_post_poll {
+            pre_post_poll()
         }
 
         match self.generator.get_mut().resume(cx.waker().clone()) {
             // If we call the future after it completed it will always return Poll::Pending.
             // But polling a completed future is either way undefined behaviour.
             None | Some(None) => {
-                // If post_poll_pending is provided execute it before returning a Poll::Pending
-                if let Some(post_poll_pending) = &self.post_poll_pending {
-                    post_poll_pending()
+                // If pre_post_poll is provided execute it before returning a Poll::Pending
+                if let Some(pre_post_poll) = &self.pre_post_poll {
+                    pre_post_poll()
                 }
                 Poll::Pending
             }
