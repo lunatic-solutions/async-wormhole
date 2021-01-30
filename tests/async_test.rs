@@ -1,6 +1,7 @@
 use async_executor::LocalExecutor;
 use async_wormhole::AsyncWormhole;
 use switcheroo::stack::*;
+use backtrace::Backtrace;
 
 #[test]
 fn async_yield() {
@@ -58,4 +59,16 @@ fn async_yield_drop_with_one_poll() {
     let ex = LocalExecutor::new();
     ex.spawn(task).detach();
     ex.try_tick();
+}
+
+
+#[test]
+fn backtrace_test() {
+    let stack = EightMbStack::new().unwrap();
+    let task = AsyncWormhole::<_, _, fn()>::new(stack, |mut yielder| {
+        let _ = Backtrace::new_unresolved();
+    })
+    .unwrap();
+
+    futures::executor::block_on(task);
 }
