@@ -1,6 +1,6 @@
 [package]
 name = "async-wormhole"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["Bernard Kolobara <me@kolobara.com>"]
 edition = "2018"
 license = "Apache-2.0/MIT"
@@ -11,7 +11,6 @@ repository = "https://github.com/bkolobara/async-wormhole/"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-crossbeam = "0.8"
 switcheroo = { path = "./switcheroo", version = "0.2" }
 
 [dev-dependencies]

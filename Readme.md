@@ -21,10 +21,6 @@ This library creates a special stack for executing the JIT code, so it's possibl
 point of the execution. Once you pass it a closure inside `AsyncWormhole::new` you will get back a future
 that you can `.await` on. The passed in closure is going to be executed on a new stack.
 
-Sometimes you also need to preserve thread local storage as the code inside the closure expects it to stay
-the same, but the actual execution can be moved between threads. There is a proof of concept API to allow
-you to move your thread local storage with the closure across threads.
-
 ## Example
 
 ```rust

@@ -3,7 +3,6 @@ use std::ptr;
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
-use async_wormhole::pool::OneMbAsyncPool;
 use async_wormhole::AsyncWormhole;
 use switcheroo::stack::*;
 
@@ -16,22 +15,10 @@ fn async_bench(c: &mut Criterion) {
     c.bench_function("async_wormhole creation", |b| {
         b.iter(|| {
             let stack = EightMbStack::new().unwrap();
-            AsyncWormhole::new(stack, |mut yielder| {
+            AsyncWormhole::<_, _, fn(), fn()>::new(stack, |mut yielder| {
                 yielder.async_suspend(async { 42 });
             })
             .unwrap();
-        })
-    });
-
-    c.bench_function("async_wormhole creation with pool", |b| {
-        let pool = OneMbAsyncPool::new(128);
-        b.iter(|| {
-            let wormhole = pool
-                .with_tls([&TLS], |mut yielder| {
-                    yielder.async_suspend(async { 42 });
-                })
-                .unwrap();
-            pool.recycle(wormhole);
         })
     });
 
@@ -39,7 +26,7 @@ fn async_bench(c: &mut Criterion) {
         b.iter_batched(
             || {
                 let stack = EightMbStack::new().unwrap();
-                let async_ = AsyncWormhole::new(stack, |mut yielder| {
+                let async_ = AsyncWormhole::<_, _, fn(), fn()>::new(stack, |mut yielder| {
                     yielder.async_suspend(async { 42 });
                 })
                 .unwrap();
@@ -53,14 +40,19 @@ fn async_bench(c: &mut Criterion) {
         );
     });
 
-    c.bench_function("async switch with TLS", |b| {
+    c.bench_function("async switch with pre and post poll hooks", |b| {
         b.iter_batched(
             || {
-                let pool = OneMbAsyncPool::new(128);
-                pool.with_tls([&TLS], |mut yielder| {
+                let stack = EightMbStack::new().unwrap();
+                let mut async_ = AsyncWormhole::<_, _, fn(), fn()>::new(stack, |mut yielder| {
                     yielder.async_suspend(async { 42 });
                 })
-                .unwrap()
+                .unwrap();
+                async_.set_pre_poll(|| {
+                    let _ = 33 + 34;
+                });
+                // post_poll_pending will never be called, because future resolves with value on first try.
+                async_
             },
             |mut task| {
                 futures::executor::block_on(&mut task);
