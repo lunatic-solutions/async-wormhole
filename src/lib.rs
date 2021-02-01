@@ -37,7 +37,7 @@
 //!     .unwrap();
 //!
 //!     let outside = futures::executor::block_on(task);
-//!     assert_eq!(outside.unwrap(), 64);
+//!     assert_eq!(outside, 64);
 //! }
 //! ```
 
@@ -127,7 +127,7 @@ where
     Stack: stack::Stack + Unpin,
     P: Fn() + Unpin,
 {
-    type Output = Option<Output>;
+    type Output = Output;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // If pre_post_poll is provided execute it before entering separate stack
@@ -145,7 +145,7 @@ where
                 }
                 Poll::Pending
             }
-            Some(out) => {
+            Some(Some(out)) => {
                 // Poll one last time to finish the generator
                 self.generator.get_mut().resume(cx.waker().clone());
                 Poll::Ready(out)
@@ -170,10 +170,10 @@ impl<'a, Output> AsyncYielder<'a, Output> {
     where
         Fut: Future<Output = R>,
     {
+        let mut future = unsafe { Pin::new_unchecked(&mut future) };
         loop {
-            let future = unsafe { Pin::new_unchecked(&mut future) };
             let mut cx = Context::from_waker(&mut self.waker);
-            self.waker = match future.poll(&mut cx) {
+            self.waker = match future.as_mut().poll(&mut cx) {
                 Poll::Pending => self.yielder.suspend(None),
                 Poll::Ready(result) => return result,
             };

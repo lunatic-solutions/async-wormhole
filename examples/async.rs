@@ -18,5 +18,5 @@ fn main() {
     .unwrap();
 
     let outside = futures::executor::block_on(task);
-    assert_eq!(outside.unwrap(), 64);
+    assert_eq!(outside, 64);
 }
