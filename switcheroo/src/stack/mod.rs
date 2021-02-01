@@ -13,7 +13,7 @@ pub use one_mb::OneMbStack;
 /// the handler has still enough of stack to process it. The name comes from the fact that it
 /// points to the top most address of the memory area designated to the stack and will be used as a
 /// pointer when freeing/deallocating the stack.
-pub trait Stack: Sized {
+pub trait Stack: Sized + Send {
     /// Returns a new stack.
     fn new() -> Result<Self, std::io::Error>;
 

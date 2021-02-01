@@ -31,6 +31,8 @@ use super::Stack;
 /// written to consume physical memory, the rest is cheap virtual memory.
 pub struct EightMbStack(*mut usize);
 
+unsafe impl Send for EightMbStack {}
+
 const EIGHT_MB: usize = 8 * 1024 * 1024;
 #[cfg(target_family = "windows")]
 const EXCEPTION_ZONE: usize = 4 * 4096;

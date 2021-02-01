@@ -28,6 +28,8 @@ use super::Stack;
 /// that Windows expect it to be, so that the OS can automatically grow and commit memory.
 pub struct OneMbStack(*mut usize);
 
+unsafe impl Send for OneMbStack {}
+
 const ONE_MB: usize = 1 * 1024 * 1024 + 4096;
 #[cfg(target_family = "windows")]
 const EXCEPTION_ZONE: usize = 4 * 4096;

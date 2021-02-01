@@ -67,36 +67,24 @@ pub use switcheroo::stack;
 /// can use this guarantee to our advantage in specific scenarios.
 pub struct AsyncWormhole<'a, Stack, Output, P>
 where
-    Stack: stack::Stack,
-    P: Fn(),
+    Stack: stack::Stack + Send,
+    P: Fn() + Send,
 {
     generator: Cell<Generator<'a, Waker, Option<Output>, Stack>>,
     pre_post_poll: Option<P>,
 }
 
-unsafe impl<Stack, Output, P> Send for AsyncWormhole<'_, Stack, Output, P>
-where
-    Stack: stack::Stack,
-    P: Fn(),
-{
-}
-
 impl<'a, Stack, Output, P> AsyncWormhole<'a, Stack, Output, P>
 where
-    Stack: stack::Stack,
-    P: Fn(),
+    Stack: stack::Stack + Send,
+    P: Fn() + Send,
 {
     /// Returns a new AsyncWormhole, using the passed `stack` to execute the closure `f` on.
     /// The closure will not be executed right away, only if you pass AsyncWormhole to an
     /// async executor (.await on it)
     pub fn new<F>(stack: Stack, f: F) -> Result<Self, Error>
     where
-        // TODO: This needs to be Send, but because Wasmtime's structures are not Send for now I don't
-        // enforce it on an API level. According to
-        // https://github.com/bytecodealliance/wasmtime/issues/793#issuecomment-692740254
-        // it is safe to move everything connected to a Store to a different thread all at once, but this
-        // is impossible to express with the type system.
-        F: FnOnce(AsyncYielder<Output>) -> Output + 'a,
+        F: FnOnce(AsyncYielder<Output>) -> Output + 'a + Send,
     {
         let generator = Generator::new(stack, |yielder, waker| {
             let async_yielder = AsyncYielder::new(yielder, waker);
@@ -124,8 +112,8 @@ where
 
 impl<'a, Stack, Output, P> Future for AsyncWormhole<'a, Stack, Output, P>
 where
-    Stack: stack::Stack + Unpin,
-    P: Fn() + Unpin,
+    Stack: stack::Stack + Unpin + Send,
+    P: Fn() + Unpin + Send,
 {
     type Output = Output;
 
