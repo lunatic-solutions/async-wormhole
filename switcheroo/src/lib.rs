@@ -182,8 +182,8 @@ where
     }
 
     /// Consume the generator and extract the stack.
-    pub fn stack(mut self) -> Option<Stack> {
-        self.stack.take()
+    pub fn stack(mut self) -> Stack {
+        self.stack.take().unwrap()
         // Drop for Generator is executed here while the stack is still alive.
     }
 }

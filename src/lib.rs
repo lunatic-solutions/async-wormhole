@@ -70,7 +70,7 @@ where
     Stack: stack::Stack + Send,
     P: Fn() + Send,
 {
-    generator: Cell<Generator<'a, Waker, Option<Output>, Stack>>,
+    generator: Option<Cell<Generator<'a, Waker, Option<Output>, Stack>>>,
     pre_post_poll: Option<P>,
 }
 
@@ -93,7 +93,7 @@ where
         });
 
         Ok(Self {
-            generator: Cell::new(generator),
+            generator: Some(Cell::new(generator)),
             pre_post_poll: None,
         })
     }
@@ -105,8 +105,13 @@ where
     }
 
     /// Get the stack from the internal generator.
-    pub fn stack(self) -> Stack {
-        self.generator.into_inner().stack().unwrap()
+    pub fn stack(mut self) -> Stack {
+        let generator = self.generator.take().unwrap().into_inner();
+        // It's important to run the destructor of the AsyncWormhole before the generator one to perform the last
+        // `pre_post_poll` call.
+        drop(self);
+        let stack = generator.stack();
+        stack
     }
 }
 
@@ -123,7 +128,13 @@ where
             pre_post_poll()
         }
 
-        match self.generator.get_mut().resume(cx.waker().clone()) {
+        match self
+            .generator
+            .as_mut()
+            .unwrap()
+            .get_mut()
+            .resume(cx.waker().clone())
+        {
             // If we call the future after it completed it will always return Poll::Pending.
             // But polling a completed future is either way undefined behaviour.
             None | Some(None) => {
@@ -135,9 +146,28 @@ where
             }
             Some(Some(out)) => {
                 // Poll one last time to finish the generator
-                self.generator.get_mut().resume(cx.waker().clone());
+                self.generator
+                    .as_mut()
+                    .unwrap()
+                    .get_mut()
+                    .resume(cx.waker().clone());
                 Poll::Ready(out)
             }
+        }
+    }
+}
+
+impl<'a, Stack, Output, P> Drop for AsyncWormhole<'a, Stack, Output, P>
+where
+    Stack: stack::Stack + Send,
+    P: Fn() + Send,
+{
+    fn drop(&mut self) {
+        // Dropping a generator can cause an unwind and execute code inside of the separate context.
+        // In this regard it's similar to a `poll` call and we need to fire pre and post poll hooks.
+        // Note, that we **don't** do a last `post_poll` call once the generator is dropped.
+        if let Some(pre_post_poll) = &self.pre_post_poll {
+            pre_post_poll()
         }
     }
 }
