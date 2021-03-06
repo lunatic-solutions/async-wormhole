@@ -1,9 +1,8 @@
 # async-wormhole
 
-[Documentation](https://docs.rs/async-wormhole/0.1.1/async_wormhole/)
+[Documentation](https://docs.rs/async-wormhole/latest/async_wormhole/)
 
-> This library is still super experimental, I use it to prototype the foundation for
-> [Lunatic](https://dev.to/bkolobara/lunatic-actor-based-webassembly-runtime-for-the-backend-36oj) .
+> This library is experimental, I use it to prototype the foundation for [Lunatic](https://lunatic.solutions/) .
 >
 > **Currently only works in Rust nightly, as it depends on [switcheroo](https://github.com/bkolobara/async-wormhole/tree/master/switcheroo).**
 
@@ -28,6 +27,7 @@ use async_wormhole::{AsyncWormhole, AsyncYielder};
 use switcheroo::stack::*;
 
 // non-async function
+#[allow(improper_ctypes_definitions)]
 extern "C" fn non_async(mut yielder: AsyncYielder<u32>) -> u32 {
 	// Suspend the runtime until async value is ready.
 	// Can contain .await calls.
@@ -36,7 +36,7 @@ extern "C" fn non_async(mut yielder: AsyncYielder<u32>) -> u32 {
 
 fn main() {
     let stack = EightMbStack::new().unwrap();
-    let task = AsyncWormhole::<_, _, ()>::new(stack, |yielder| {
+    let task = AsyncWormhole::<_, _, fn()>::new(stack, |yielder| {
         let result = non_async(yielder);
         assert_eq!(result, 42);
         64
@@ -44,7 +44,8 @@ fn main() {
     .unwrap();
 
     let outside = futures::executor::block_on(task);
-    assert_eq!(outside.unwrap(), 64);
+    assert_eq!(outside, 64);
+}
 ```
 
 ## Performance

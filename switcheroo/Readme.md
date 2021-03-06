@@ -16,7 +16,7 @@ use switcheroo::Generator;
 
 fn  main() {
     let stack = EightMbStack::new().unwrap();
-    let  mut add_one = Generator::new(stack, |yielder, mut input| {
+    let mut add_one = Generator::new(stack, |yielder, mut input| {
         loop {
             if input ==  0 {
                 break;
@@ -38,9 +38,10 @@ On my Macbook Pro 15" (Late 2013) each context switch is comparable to a functio
 
 ## Developer Experience
 
-Switcheroo **tries** hard to not let the context switching disturb default Rust behaviour on panics. The displayed backtrace should stretch across the context switch boundary.
+Switcheroo **tries** hard to not let the context switching disturb default Rust behaviour on panics and unwinds.
+The displayed backtrace should stretch across the context switch boundary.
 
-> There are known bugs on Windows, where this doesn't perfectly work because of how Rust handles naked functions on windows: [#75897](https://github.com/rust-lang/rust/issues/75897)
+When dropping a non-empty stack, it will be unwind to free any resources allocated on it.
 
 ## License
 

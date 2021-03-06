@@ -12,7 +12,7 @@
 //!
 //! fn  main() {
 //! 	let stack = EightMbStack::new().unwrap();
-//! 	let  mut add_one = Generator::new(stack, |yielder, mut input| {
+//! 	let mut add_one = Generator::new(stack, |yielder, mut input| {
 //! 		loop {
 //! 			if input ==  0 {
 //! 				break;
