@@ -61,6 +61,7 @@ fn async_yield_drop_with_one_poll() {
     ex.try_tick();
 }
 
+#[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
 #[test]
 fn backtrace_test() {
     let stack = EightMbStack::new().unwrap();
