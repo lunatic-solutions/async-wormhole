@@ -118,13 +118,13 @@ where
 impl<'a, Stack, Output, P> Future for AsyncWormhole<'a, Stack, Output, P>
 where
     Stack: stack::Stack + Unpin + Send,
-    P: Fn() + Unpin + Send,
+    P: FnMut() + Unpin + Send,
 {
     type Output = Output;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // If pre_post_poll is provided execute it before entering separate stack
-        if let Some(pre_post_poll) = &self.pre_post_poll {
+        if let Some(pre_post_poll) = &mut self.pre_post_poll {
             pre_post_poll()
         }
 
@@ -139,7 +139,7 @@ where
             // But polling a completed future is either way undefined behaviour.
             None | Some(None) => {
                 // If pre_post_poll is provided execute it before returning a Poll::Pending
-                if let Some(pre_post_poll) = &self.pre_post_poll {
+                if let Some(pre_post_poll) = &mut self.pre_post_poll {
                     pre_post_poll()
                 }
                 Poll::Pending

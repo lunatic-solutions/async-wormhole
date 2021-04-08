@@ -1,6 +1,6 @@
 [package]
 name = "async-wormhole"
-version = "0.3.4"
+version = "0.3.5"
 authors = ["Bernard Kolobara <me@kolobara.com>"]
 edition = "2018"
 license = "Apache-2.0/MIT"
