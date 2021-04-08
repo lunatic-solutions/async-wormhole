@@ -68,7 +68,7 @@ pub use switcheroo::stack;
 pub struct AsyncWormhole<'a, Stack, Output, P>
 where
     Stack: stack::Stack + Send,
-    P: Fn() + Send,
+    P: FnMut() + Send,
 {
     generator: Option<Cell<Generator<'a, Waker, Option<Output>, Stack>>>,
     pre_post_poll: Option<P>,
@@ -77,7 +77,7 @@ where
 impl<'a, Stack, Output, P> AsyncWormhole<'a, Stack, Output, P>
 where
     Stack: stack::Stack + Send,
-    P: Fn() + Send,
+    P: FnMut() + Send,
 {
     /// Returns a new AsyncWormhole, using the passed `stack` to execute the closure `f` on.
     /// The closure will not be executed right away, only if you pass AsyncWormhole to an
@@ -160,13 +160,13 @@ where
 impl<'a, Stack, Output, P> Drop for AsyncWormhole<'a, Stack, Output, P>
 where
     Stack: stack::Stack + Send,
-    P: Fn() + Send,
+    P: FnMut() + Send,
 {
     fn drop(&mut self) {
         // Dropping a generator can cause an unwind and execute code inside of the separate context.
         // In this regard it's similar to a `poll` call and we need to fire pre and post poll hooks.
         // Note, that we **don't** do a last `post_poll` call once the generator is dropped.
-        if let Some(pre_post_poll) = &self.pre_post_poll {
+        if let Some(pre_post_poll) = &mut self.pre_post_poll {
             pre_post_poll()
         }
     }
