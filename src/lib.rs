@@ -107,11 +107,14 @@ where
     /// Get the stack from the internal generator.
     pub fn stack(mut self) -> Stack {
         let generator = self.generator.take().unwrap().into_inner();
-        // It's important to run the destructor of the AsyncWormhole before the generator one to perform the last
-        // `pre_post_poll` call.
-        drop(self);
-        let stack = generator.stack();
-        stack
+        // If the generator didn't finish yet, the stack is going to be unwinded on drop().
+        // Fire a last pre_post_poll before this happens.
+        if generator.started() && !generator.finished() {
+            if let Some(pre_post_poll) = &mut self.pre_post_poll {
+                pre_post_poll();
+            }
+        }
+        generator.stack()
     }
 }
 
@@ -167,7 +170,11 @@ where
         // In this regard it's similar to a `poll` call and we need to fire pre and post poll hooks.
         // Note, that we **don't** do a last `post_poll` call once the generator is dropped.
         if let Some(pre_post_poll) = &mut self.pre_post_poll {
-            pre_post_poll()
+            if let Some(generator) = self.generator.as_mut() {
+                if generator.get_mut().started() && !generator.get_mut().finished() {
+                    pre_post_poll()
+                }
+            }
         }
     }
 }
