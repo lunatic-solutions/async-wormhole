@@ -89,7 +89,7 @@ pub unsafe fn swap_and_link_stacks(
         inout("rdx") new_sp => _,
         inout("rdi") arg => ret_val, // 1st argument to called function
         out("rsi") ret_sp, // 2nd argument to called function
-        out("rax") _, out("rbx") _,
+        out("rax") _,
 
         out("r8") _, out("r9") _, out("r10") _, out("r11") _,
         out("r12") _, out("r13") _, out("r14") _, out("r15") _,
@@ -140,7 +140,7 @@ pub unsafe fn swap(arg: usize, new_sp: *mut usize) -> (usize, *mut usize) {
         inout("rdx") new_sp => _,
         inout("rdi") arg => ret_val, // 1st argument to called function
         out("rsi") ret_sp, // 2nd argument to called function
-        out("rax") _, out("rbx") _, out("rcx") _,
+        out("rax") _, out("rcx") _,
 
         out("r8") _, out("r9") _, out("r10") _, out("r11") _,
         out("r12") _, out("r13") _, out("r14") _, out("r15") _,
