@@ -27,21 +27,32 @@ pub unsafe fn init<S: stack::Stack>(
             // be described in different ways with seh_* directives, but after many tests this was established
             // to be the most reliable one under debug and release builds. The produced unwind codes are:
             //
-            // 0x03: UOP_PushNonVol RSP - Restore the RSP by pointing it to the previous stack and increment it
-            //             by 8, jumping over the stack place holding the the deallocation stack.
-            // 0x02: UOP_AllocSmall 16  - Increment the RSP by 16 jumping over 2 stack slots: stack limit & base.
+            // 0x04: UOP_PushNonVol RSP - Restore the RSP by pointing it to the previous stack and increment it
+            //                            by 8, jumping over the stack place holding the the deallocation stack.
+            // 0x03: UOP_AllocSmall 16  - Increment the RSP by 16 jumping over 2 stack slots: stack limit & base.
+            // 0x02: UOP_PushNonVol RBX - Restore RBX register that is used internally by LLVM and can't be
+            //                            marked as clobbered.
             // 0x01: UOP_PushNonVol RBP - Pop the previous RBP from the stack.
             //
-            // Once the unwinder reaches this function the value on the stack is going to be the value of the previous
-            // RSP. After it processes the unwind codes it will look like `trampoline` was called from the `swap` function,
-            // because the next value on the stack is the IP value pointing back inside `swap`.
+            // Once the unwinder reaches this function the value on the stack is going to be the value of the
+            // previous RSP. After it processes the unwind codes it will look like `trampoline` was called from
+            // the `swap` function, because the next value on the stack is the IP value pointing back inside
+            // `swap`.
             //
             // Opposite of Unix systems, here we only need one trampoline function to achieve the same outcome.
             //
-            //TODO: Create ASCII art showing how exactly the stack looks.
+            // NOTE: To get the unwind codes from a Windows executable run:
+            // 1. rabin2.exe -P .\target\debug\examples\async.pdb > pdb.txt
+            // 2. Search inside the pdb.txt file to locate the `trampoline` function and note the address.
+            // 3. llvm-objdump -u target\debug\examples\async.exe > unwind_info.txt
+            // 4. Use the address from step 2 to locate the unwind codes of the `trampline` function.
+            //
+            // TODO: Create ASCII art showing how exactly the stack looks.
             ".seh_proc trampoline",
             "nop",
             ".seh_pushreg rbp",
+            "nop",
+            ".seh_pushreg rbx",
             "nop",
             ".seh_stackalloc 16",
             "nop",
@@ -57,8 +68,11 @@ pub unsafe fn init<S: stack::Stack>(
 
     // Save frame pointer
     let frame = sp;
-    sp = push(sp, trampoline as usize + 3); //  "call [rsp + 16]" instruction
+    sp = push(sp, trampoline as usize + 4); //  "call [rsp + 8]" instruction
     sp = push(sp, frame as usize);
+
+    // Set rbx starting value to 0
+    sp = push(sp, 0);
 
     // The next few values are not really documented in Windows and we rely on this Wiki page:
     // https://en.wikipedia.org/wiki/Win32_Thread_Information_Block
@@ -96,6 +110,8 @@ pub unsafe fn swap_and_link_stacks(
         "push rax",
         // Save the frame pointer as it can't be marked as an output register.
         "push rbp",
+        // rbx is is used internally by LLVM and can't be marked as an output register.
+        "push rbx",
 
         // Load NT_TIB
         "mov r10, gs:[030h]",
@@ -127,6 +143,8 @@ pub unsafe fn swap_and_link_stacks(
         "pop rax",
         "mov  [r10+08h], rax",
 
+        // Restore rbx
+        "pop rbx",
         // Set the frame pointer according to the new stack.
         "pop rbp",
         // Get the next instruction to jump to.
@@ -140,7 +158,7 @@ pub unsafe fn swap_and_link_stacks(
         inout("rsi") new_sp => _,
         inout("rcx") arg => ret_val, // 1st argument to called function
         out("rdx") ret_sp, // 2nd argument to called function
-        out("rax") _, out("rbx") _,
+        out("rax") _,
 
         out("r8") _, out("r9") _, out("r10") _, out("r11") _,
         out("r12") _, out("r13") _, out("r14") _, out("r15") _,
@@ -165,6 +183,8 @@ pub unsafe fn swap(arg: usize, new_sp: *mut usize) -> (usize, *mut usize) {
         "push rax",
         // Save the frame pointer as it can't be marked as an output register.
         "push rbp",
+        // rbx is is used internally by LLVM can't be marked as an output register.
+        "push rbx",
 
         // Load NT_TIB
         "mov r10, gs:[030h]",
@@ -193,6 +213,8 @@ pub unsafe fn swap(arg: usize, new_sp: *mut usize) -> (usize, *mut usize) {
         "pop rax",
         "mov  [r10+08h], rax",
 
+        // Restore rbx
+        "pop rbx",
         // Set the frame pointer according to the new stack.
         "pop rbp",
         // Get the next instruction to jump to.
@@ -205,7 +227,7 @@ pub unsafe fn swap(arg: usize, new_sp: *mut usize) -> (usize, *mut usize) {
         inout("rsi") new_sp => _,
         inout("rcx") arg => ret_val, // 1st argument to called function
         out("rdx") ret_sp, // 2nd argument to called function
-        out("rax") _, out("rbx") _, out("rdi") _,
+        out("rax") _,  out("rdi") _,
 
         out("r8") _, out("r9") _, out("r10") _, out("r11") _,
         out("r12") _, out("r13") _, out("r14") _, out("r15") _,
