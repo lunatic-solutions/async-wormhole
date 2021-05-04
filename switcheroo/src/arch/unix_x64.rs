@@ -19,8 +19,9 @@ pub unsafe fn init<S: stack::Stack>(
     #[naked]
     unsafe extern "C" fn trampoline_1() {
         asm!(
-            ".cfi_def_cfa rbp, 16",
+            ".cfi_def_cfa rbp, 24",
             ".cfi_offset rbp, -16",
+            "nop",
             "nop",
             "nop",
             options(noreturn)
@@ -29,7 +30,7 @@ pub unsafe fn init<S: stack::Stack>(
 
     // Call frame for trampoline_2. The CFA slot is updated by swap::trampoline
     // each time a context switch is performed.
-    sp = push(sp, trampoline_1 as usize + 2); // Point to return instruction after 2 x nop
+    sp = push(sp, trampoline_1 as usize + 2); // Point to 3rd nop instruction
     sp = push(sp, 0xdeaddeaddead0cfa);
 
     #[naked]
@@ -52,6 +53,9 @@ pub unsafe fn init<S: stack::Stack>(
     sp = push(sp, trampoline_2 as usize + 1); // call instruction
     sp = push(sp, frame as usize);
 
+    // Set rbx starting value to 0
+    sp = push(sp, 0);
+
     sp
 }
 
@@ -70,12 +74,16 @@ pub unsafe fn swap_and_link_stacks(
         "push rax",
         // Save the frame pointer as it can't be marked as an output register.
         "push rbp",
+        // rbx is is used internally by LLVM and can't be marked as an output register.
+        "push rbx",
         // Link stacks by swapping the CFA value
         "mov [rcx - 32], rsp",
         // Set the current pointer as the 2nd element (rsi) of the function we are jumping to.
         "mov rsi, rsp",
         // Change the stack pointer to the passed value.
         "mov rsp, rdx",
+        // Restore rbx
+        "pop rbx",
         // Set the frame pointer according to the new stack.
         "pop rbp",
         // Get the next instruction to jump to.
@@ -89,7 +97,7 @@ pub unsafe fn swap_and_link_stacks(
         inout("rdx") new_sp => _,
         inout("rdi") arg => ret_val, // 1st argument to called function
         out("rsi") ret_sp, // 2nd argument to called function
-        out("rax") _, out("rbx") _,
+        out("rax") _,
 
         out("r8") _, out("r9") _, out("r10") _, out("r11") _,
         out("r12") _, out("r13") _, out("r14") _, out("r15") _,
@@ -124,10 +132,14 @@ pub unsafe fn swap(arg: usize, new_sp: *mut usize) -> (usize, *mut usize) {
         "push rax",
         // Save the frame pointer as it can't be marked as an output register.
         "push rbp",
+        // rbx is is used internally by LLVM and can't be marked as an output register.
+        "push rbx",
         // Set the current pointer as the 2nd element (rsi) of the function we are jumping to.
         "mov rsi, rsp",
         // Change the stack pointer to the passed value.
         "mov rsp, rdx",
+        // Restore rbx
+        "pop rbx",
         // Set the frame pointer according to the new stack.
         "pop rbp",
         // Get the next instruction to jump to.
@@ -140,7 +152,7 @@ pub unsafe fn swap(arg: usize, new_sp: *mut usize) -> (usize, *mut usize) {
         inout("rdx") new_sp => _,
         inout("rdi") arg => ret_val, // 1st argument to called function
         out("rsi") ret_sp, // 2nd argument to called function
-        out("rax") _, out("rbx") _, out("rcx") _,
+        out("rax") _, out("rcx") _,
 
         out("r8") _, out("r9") _, out("r10") _, out("r11") _,
         out("r12") _, out("r13") _, out("r14") _, out("r15") _,
