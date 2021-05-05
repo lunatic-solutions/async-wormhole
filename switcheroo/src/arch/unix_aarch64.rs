@@ -20,8 +20,10 @@ pub unsafe fn init<S: stack::Stack>(
     unsafe extern "C" fn trampoline_1() {
         asm!(
             ".cfi_def_cfa x29, 16",
-            ".cfi_offset x30, -8",
-            ".cfi_offset x29, -16",
+            ".cfi_offset  x30, -8",
+            ".cfi_offset  x29, -16",
+            "nop",
+            "nop",
             "nop",
             options(noreturn)
         )
@@ -29,15 +31,15 @@ pub unsafe fn init<S: stack::Stack>(
 
     // Call frame for trampoline_2. The CFA slot is updated by swap::trampoline
     // each time a context switch is performed.
-    sp = push(sp, trampoline_1 as usize + 4); // Point to return instruction after 2 x nop
+    sp = push(sp, trampoline_1 as usize + 3); // Points to 3rd nop
     sp = push(sp, 0xdeaddeaddead0cfa);
 
     #[naked]
     unsafe extern "C" fn trampoline_2() {
         asm!(
             ".cfi_def_cfa x29, 16",
-            ".cfi_offset x30, -8",
-            ".cfi_offset x29, -16",
+            ".cfi_offset  x30, -8",
+            ".cfi_offset  x29, -16",
             "nop",
             "ldr x2, [sp, #16]",
             "blr x2",

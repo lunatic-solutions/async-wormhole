@@ -11,46 +11,33 @@ pub unsafe fn init<S: stack::Stack>(
     }
 
     let mut sp = stack.bottom();
-    // Align stack
-    sp = push(sp, 0);
+
     // Save the (generator_wrapper) function on the stack.
     sp = push(sp, f as usize);
-
-    #[naked]
-    unsafe extern "C" fn trampoline_1() {
-        asm!(
-            ".cfi_def_cfa rbp, 24",
-            ".cfi_offset rbp, -16",
-            "nop",
-            "nop",
-            "nop",
-            options(noreturn)
-        )
-    }
-
-    // Call frame for trampoline_2. The CFA slot is updated by swap::trampoline
-    // each time a context switch is performed.
-    sp = push(sp, trampoline_1 as usize + 2); // Point to 3rd nop instruction
     sp = push(sp, 0xdeaddeaddead0cfa);
 
     #[naked]
-    unsafe extern "C" fn trampoline_2() {
+    unsafe extern "C" fn trampoline() {
         asm!(
-            // call frame address = take address from register RBP and add offset 16 to it.
-            // RBP at this point contains the address of the *Caller frame* stack location.
-            // The *Caller frame* location contains the value of the previous RSP.
-            ".cfi_def_cfa rbp, 16",
-            // previous value of RBP is saved at CFA + 16
-            ".cfi_offset rbp, -16",
+            ".cfi_escape 0x0f,/* DW_CFA_def_cfa_expression */ \
+                4,            /* the byte length of this expression */ \
+                0x57,         /* DW_OP_reg7 (%rsp) */ \
+                0x06,         /* DW_OP_deref */ \
+                0x23, 0x0     /* DW_OP_plus_uconst 0x0 */",
+
+            ".cfi_rel_offset rip, -8",
+            ".cfi_rel_offset rbp, -16",
+            ".cfi_rel_offset rbx, -24",
+
             "nop",
-            "call [rsp + 16]",
+            "call [rsp + 8]",
             options(noreturn)
         )
     }
 
     // Save frame pointer
     let frame = sp;
-    sp = push(sp, trampoline_2 as usize + 1); // call instruction
+    sp = push(sp, trampoline as usize + 1); // call instruction
     sp = push(sp, frame as usize);
 
     // Set rbx starting value to 0
@@ -77,7 +64,7 @@ pub unsafe fn swap_and_link_stacks(
         // rbx is is used internally by LLVM and can't be marked as an output register.
         "push rbx",
         // Link stacks by swapping the CFA value
-        "mov [rcx - 32], rsp",
+        "mov [rcx - 16], rsp",
         // Set the current pointer as the 2nd element (rsi) of the function we are jumping to.
         "mov rsi, rsp",
         // Change the stack pointer to the passed value.
