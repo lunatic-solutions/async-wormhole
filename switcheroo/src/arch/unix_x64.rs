@@ -51,6 +51,7 @@ pub unsafe fn init<S: stack::Stack>(
     let frame = sp;
     sp = push(sp, trampoline_2 as usize + 1); // call instruction
     sp = push(sp, frame as usize);
+    sp = push(sp, 0 as usize); // make space for rbx value
 
     sp
 }
@@ -70,17 +71,21 @@ pub unsafe fn swap_and_link_stacks(
         "push rax",
         // Save the frame pointer as it can't be marked as an output register.
         "push rbp",
+        // Save rbx (used by LLVM)
+        "push rbx",
         // Link stacks by swapping the CFA value
         "mov [rcx - 32], rsp",
         // Set the current pointer as the 2nd element (rsi) of the function we are jumping to.
         "mov rsi, rsp",
         // Change the stack pointer to the passed value.
         "mov rsp, rdx",
+        // Restore rbx (used by LLVM)
+        "pop rbx",
         // Set the frame pointer according to the new stack.
         "pop rbp",
         // Get the next instruction to jump to.
         "pop rax",
-        // Doing a pop & jmp instad of a ret helps us here with brench prediction (3x faster on my machine).
+        // Doing a pop & jmp instead of a ret helps us here with branch prediction (3x faster on my machine).
         "jmp rax",
         "1337:",
         // Mark all registers as clobbered as we don't know what the code we are jumping to is going to use.
@@ -124,15 +129,19 @@ pub unsafe fn swap(arg: usize, new_sp: *mut usize) -> (usize, *mut usize) {
         "push rax",
         // Save the frame pointer as it can't be marked as an output register.
         "push rbp",
+        // Save rbx (used by LLVM)
+        "push rbx",
         // Set the current pointer as the 2nd element (rsi) of the function we are jumping to.
         "mov rsi, rsp",
         // Change the stack pointer to the passed value.
         "mov rsp, rdx",
+        // Restore rbx (used by LLVM)
+        "pop rbx",
         // Set the frame pointer according to the new stack.
         "pop rbp",
         // Get the next instruction to jump to.
         "pop rax",
-        // Doing a pop & jmp instad of a ret helps us here with brench prediction (3x faster on my machine).
+        // Doing a pop & jmp instead of a ret helps us here with branch prediction (3x faster on my machine).
         "jmp rax",
         "1337:",
         // Mark all registers as clobbered as we don't know what the code we are jumping to is going to use.
