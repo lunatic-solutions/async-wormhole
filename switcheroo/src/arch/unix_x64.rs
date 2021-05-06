@@ -20,7 +20,7 @@ pub unsafe fn init<S: stack::Stack>(
     unsafe extern "C" fn trampoline() {
         asm!(
             // Stops unwinding/backtracing at this function.
-            ".cfi_undefined rip"
+            ".cfi_undefined rip",
             "call [rsp + 8]",
             options(noreturn)
         )
