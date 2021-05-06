@@ -11,37 +11,17 @@ pub unsafe fn init<S: stack::Stack>(
     }
 
     let mut sp = stack.bottom();
-    // Align stack
-    sp = push(sp, 0);
+
     // Save the (generator_wrapper) function on the stack.
     sp = push(sp, f as usize);
-
-    #[naked]
-    unsafe extern "C" fn trampoline_1() {
-        asm!(
-            ".cfi_def_cfa x29, 16",
-            ".cfi_offset  x30, -8",
-            ".cfi_offset  x29, -16",
-            "nop",
-            "nop",
-            "nop",
-            options(noreturn)
-        )
-    }
-
-    // Call frame for trampoline_2. The CFA slot is updated by swap::trampoline
-    // each time a context switch is performed.
-    sp = push(sp, trampoline_1 as usize + 3); // Points to 3rd nop
     sp = push(sp, 0xdeaddeaddead0cfa);
 
     #[naked]
-    unsafe extern "C" fn trampoline_2() {
+    unsafe extern "C" fn trampoline() {
         asm!(
-            ".cfi_def_cfa x29, 16",
-            ".cfi_offset  x30, -8",
-            ".cfi_offset  x29, -16",
-            "nop",
-            "ldr x2, [sp, #16]",
+            // Stops unwinding/backtracing at this function.
+            ".cfi_undefined lr",
+            "ldr x2, [sp, #8]",
             "blr x2",
             options(noreturn)
         )
@@ -49,8 +29,11 @@ pub unsafe fn init<S: stack::Stack>(
 
     // Save frame pointer
     let frame = sp;
-    sp = push(sp, trampoline_2 as usize + 4); // call instruction
+    sp = push(sp, trampoline as usize);
     sp = push(sp, frame as usize);
+
+    // x18 & x 19
+    sp = push(sp, 0); sp = push(sp, 0);
 
     sp
 }
@@ -67,9 +50,11 @@ pub unsafe fn swap_and_link_stacks(
     asm!(
         "adr lr, 1337f",
         "stp x29, x30, [sp, #-16]!",
+        "stp x18, x19, [sp, #-16]!",
         "mov x1, sp",
         "str x1, [x3, #-32]",
         "mov sp, x2",
+        "ldp x18, x19, [sp], #16",
         "ldp x29, x30, [sp], #16",
         "br x30",
         "1337:",
@@ -82,7 +67,7 @@ pub unsafe fn swap_and_link_stacks(
         out("x4") _, out("x5") _, out("x6") _, out("x7") _,
         out("x8") _, out("x9") _, out("x10") _, out("x11") _,
         out("x12") _, out("x13") _, out("x14") _, out("x15") _,
-        out("x16") _, out("x17") _, out("x18") _, out("x19") _,
+        out("x16") _, out("x17") _,
         out("x20") _, out("x21") _, out("x22") _, out("x23") _,
         out("x24") _, out("x25") _, out("x26") _, out("x27") _,
         out("x28") _, out("lr") _,
@@ -108,8 +93,10 @@ pub unsafe fn swap(arg: usize, new_sp: *mut usize) -> (usize, *mut usize) {
     asm!(
         "adr lr, 1337f",
         "stp x29, x30, [sp, #-16]!",
+        "stp x18, x19, [sp, #-16]!",
         "mov x1, sp",
         "mov sp, x2",
+        "ldp x18, x19, [sp], #16",
         "ldp x29, x30, [sp], #16",
         "br x30",
         "1337:",
@@ -121,7 +108,7 @@ pub unsafe fn swap(arg: usize, new_sp: *mut usize) -> (usize, *mut usize) {
         out("x4") _, out("x5") _, out("x6") _, out("x7") _,
         out("x8") _, out("x9") _, out("x10") _, out("x11") _,
         out("x12") _, out("x13") _, out("x14") _, out("x15") _,
-        out("x16") _, out("x17") _, out("x18") _, out("x19") _,
+        out("x16") _, out("x17") _,
         out("x20") _, out("x21") _, out("x22") _, out("x23") _,
         out("x24") _, out("x25") _, out("x26") _, out("x27") _,
         out("x28") _, out("lr") _,
