@@ -19,17 +19,8 @@ pub unsafe fn init<S: stack::Stack>(
     #[naked]
     unsafe extern "C" fn trampoline() {
         asm!(
-            ".cfi_escape 0x0f,/* DW_CFA_def_cfa_expression */ \
-                4,            /* the byte length of this expression */ \
-                0x57,         /* DW_OP_reg7 (%rsp) */ \
-                0x06,         /* DW_OP_deref */ \
-                0x23, 0x0     /* DW_OP_plus_uconst 0x0 */",
-
-            ".cfi_rel_offset rip, -8",
-            ".cfi_rel_offset rbp, -16",
-            ".cfi_rel_offset rbx, -24",
-
-            "nop",
+            // Stops unwinding/backtracing at this function.
+            ".cfi_undefined rip"
             "call [rsp + 8]",
             options(noreturn)
         )
@@ -37,7 +28,7 @@ pub unsafe fn init<S: stack::Stack>(
 
     // Save frame pointer
     let frame = sp;
-    sp = push(sp, trampoline as usize + 1); // call instruction
+    sp = push(sp, trampoline as usize); // call instruction
     sp = push(sp, frame as usize);
 
     // Set rbx starting value to 0
