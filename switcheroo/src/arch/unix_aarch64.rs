@@ -1,4 +1,5 @@
 use crate::stack;
+use core::arch::asm;
 
 pub unsafe fn init<S: stack::Stack>(
     stack: &S,
