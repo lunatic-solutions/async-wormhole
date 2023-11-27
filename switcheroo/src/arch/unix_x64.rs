@@ -1,6 +1,10 @@
 use crate::stack;
 use core::arch::asm;
 
+extern "C" {
+    fn switcheroo_trampoline();
+}
+
 pub unsafe fn init<S: stack::Stack>(
     stack: &S,
     f: unsafe extern "C" fn(usize, *mut usize),
@@ -17,19 +21,9 @@ pub unsafe fn init<S: stack::Stack>(
     sp = push(sp, f as usize);
     sp = push(sp, 0xdeaddeaddead0cfa);
 
-    #[naked]
-    unsafe extern "C" fn trampoline() {
-        asm!(
-            // Stops unwinding/backtracing at this function.
-            ".cfi_undefined rip",
-            "call [rsp + 8]",
-            options(noreturn)
-        )
-    }
-
     // Save frame pointer
     let frame = sp;
-    sp = push(sp, trampoline as usize); // call instruction
+    sp = push(sp, switcheroo_trampoline as usize); // call instruction
     sp = push(sp, frame as usize);
 
     // Set rbx starting value to 0
